@@ -1,0 +1,30 @@
+*.pyc
+*~
+*.bak
+
+## Added for PyCharm
+*.iml
+.idea/
+
+## For Data
+*.table
+storage*
+*.db
+*.config
+data/*
+!data/README.md
+libs/
+
+## web2py
+progress.log
+cache/*
+databases/*
+errors/*
+sessions/*
+
+## Personal data
+*credentials*
+notes/*
+
+## For outputs
+*outfile*

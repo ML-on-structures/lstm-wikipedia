@@ -16,7 +16,7 @@ M = 12
 Nf = 14
 
 
-def _train_nn_with_k_lstm_bits(data_list, k=None, N=1000):
+def _train_nn_with_k_lstm_bits(data_list, k=None, N=1000, weighted_learning=False):
     """
     Get the items of dict of authors with each value containing:
      author, (matrix_of 0:n-1 revisions with features and quality,
@@ -44,7 +44,7 @@ def _train_nn_with_k_lstm_bits(data_list, k=None, N=1000):
     # Initialize an LSTM
     lstm = LSTM()
     lstm.initialize(Nf, M)
-
+    learning_factor = 1.0
     # Initialize a Neural Network
     nnet = DNN()
 
@@ -98,7 +98,13 @@ def _train_nn_with_k_lstm_bits(data_list, k=None, N=1000):
             back_el[:k] = bp_res[:k]
 
             # Send the result on bit back through the LSTM
-            lstm.backward_adadelta(back_el)
+
+            if weighted_learning:
+                # Get update size using average of this revision's
+                # char added and char subtracted (fy[3] and fy[4])
+                update_size = np.average((fy[3],fy[4]))
+                learning_factor = np.square(update_size);
+            lstm.backward_adadelta(back_el, learning_factor=learning_factor)
 
         # Print average error
         iter_ctr+=1
@@ -165,7 +171,8 @@ def train_nn_using_k_lstm_bit(train_dict,
                               k=None,
                               N=1000,
                               store=False,
-                              picklefile=os.path.join(os.getcwd(), 'data','temp_model.pkl')):
+                              picklefile=os.path.join(os.getcwd(), 'data','temp_model.pkl'),
+                              weighted_learning=False):
     """
     Train the LSTM and NNet combination using training dict.
 
@@ -181,7 +188,7 @@ def train_nn_using_k_lstm_bit(train_dict,
     # Send for training using k as no. of bits to use
     print "\n==Starting training== (Using %r iterations)"%(N)
     t_start = time.clock()
-    (lstm_out, nn_out), errors = _train_nn_with_k_lstm_bits(train_items, k=k, N=N)
+    (lstm_out, nn_out), errors = _train_nn_with_k_lstm_bits(train_items, k=k, N=N, weighted_learning=weighted_learning)
     print "Training completed in %r seconds"%(time.clock()-t_start)
 
     # Store the trained model into a pickle if store is True
@@ -210,16 +217,14 @@ def test_nn_using_1_lstm_bit(test_dict, lstm, nnet):
     :param test_dict:
     :return:
     """
-    from json_plus import Serializable
-
-    serialize_file_lstm = os.path.join(os.getcwd(), 'data','ser_file_lstm.json')
-    serialize_file_nn = os.path.join(os.getcwd(), 'data','ser_file_nn.json')
-    from json_plus import Serializable
-
-    with open(serialize_file_lstm, 'rb') as input:
-        lstm = Serializable.loads(json.load(input))
-    with open(serialize_file_nn, 'rb') as input:
-        nnet = Serializable.loads(json.load(input))
+    # serialize_file_lstm = os.path.join(os.getcwd(), 'data','ser_file_lstm.json')
+    # serialize_file_nn = os.path.join(os.getcwd(), 'data','ser_file_nn.json')
+    # from json_plus import Serializable
+    #
+    # with open(serialize_file_lstm, 'rb') as input:
+    #     lstm = Serializable.loads(json.load(input))
+    # with open(serialize_file_nn, 'rb') as input:
+    #     nnet = Serializable.loads(json.load(input))
 
     # Send test data with trained model for testing
     validation_result = _test_nn_with_k_lstm_bits(test_dict, lstm, nnet, st=0, k=1)

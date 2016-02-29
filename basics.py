@@ -25,7 +25,7 @@ def load_data(files=False):
     # Read data and send to processing
     training = json_to_data(json.load(open(trn_file, 'r')))
     test = json_to_data(json.load(open(tst_file, 'r')))
-
+    print "Data loaded: %r Training elements, and %r Test elements"%(len(training.items()), len(test.items()))
     return training, test
 
 
@@ -82,7 +82,9 @@ if __name__ == "__main__":
     # print postive, negative, ratio
     # print "Neg/All for only last revisoins of each user", ratio_only_last, 2*(ratio_only_last)*(1-ratio_only_last)
     # print "Neg/All for all revisions", ratio, 2*(ratio)*(1-ratio)
+    N = 5
+    picklefile = os.path.join(os.getcwd(), 'data', 'trained_lstm_%r.pkl'%(N))
 
-    from training import train_nn_using_1_lstm_bit, test_nn_using_1_lstm_bit
-    (lstm, nn) = train_nn_using_1_lstm_bit(training)
+    from training import train_nn_using_k_lstm_bit, test_nn_using_1_lstm_bit
+    (lstm, nn) = train_nn_using_k_lstm_bit(training, k=1, store=True, N=N, picklefile=picklefile)
     test_nn_using_1_lstm_bit(test, lstm, nn)

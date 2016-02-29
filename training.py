@@ -1,12 +1,13 @@
+import json
 import os
 import pickle
 import random
 import numpy as np
+import time
+
 from lstm import LSTM
 from nn_base import DNN
 
-# Number of iterations
-N = 5#000
 
 # Number of hidden layers in LSTM
 M = 12
@@ -15,7 +16,7 @@ M = 12
 Nf = 14
 
 
-def _train_nn_with_k_lstm_bits(data_list, k=None):
+def _train_nn_with_k_lstm_bits(data_list, k=None, N=1000):
     """
     Get the items of dict of authors with each value containing:
      author, (matrix_of 0:n-1 revisions with features and quality,
@@ -153,33 +154,54 @@ def _test_nn_with_k_lstm_bits(test_data, lstm, nnet, st=0, k=None):
         e = np.sum((y - yt) ** 2)
         errors = np.append(errors, e)
 
-        print"Err for %r user : %r" %(cnt, e)
+        #print"Err for %r user : %r" %(cnt, e)
 
     print "Average validation error: ", np.average(errors)
 
     return np.average(errors)
 
 
-def train_nn_using_1_lstm_bit(train_dict, store=False, picklefile=None):
+def train_nn_using_k_lstm_bit(train_dict,
+                              k=None,
+                              N=1000,
+                              store=False,
+                              picklefile=os.path.join(os.getcwd(), 'data','temp_model.pkl')):
     """
+    Train the LSTM and NNet combination using training dict.
 
-    :param train_dict:
-    :param store:
-    :param picklefile:
-    :return:
+    :param train_dict: dict containing entries of revisions per user
+    :param k: Number of bits to be used from LSTM
+    :param N: Number of iterations for network to train. Default is 1000
+    :param store: Boolean to decide whether to store result in pickle
+    :param picklefile: Pickle filename
+    :return: Returns a tuple consisting of lstm and neural net (lstm, nnet)
     """
     train_items = train_dict.items()
 
     # Send for training using k as no. of bits to use
-    net_result, errors = _train_nn_with_k_lstm_bits(train_items, k=1)
+    print "\n==Starting training== (Using %r iterations)"%(N)
+    t_start = time.clock()
+    (lstm_out, nn_out), errors = _train_nn_with_k_lstm_bits(train_items, k=k, N=N)
+    print "Training completed in %r seconds"%(time.clock()-t_start)
 
     # Store the trained model into a pickle if store is True
     if store:
-        # Store the (wikipedia_lstm, nnet) type result into a pickle
-        with open(picklefile, 'wb') as output:
-            pickle.dump(net_result, output, pickle.HIGHEST_PROTOCOL)
+        serialize_file_lstm = os.path.join(os.getcwd(), 'data','ser_file_lstm.json')
+        serialize_file_nn = os.path.join(os.getcwd(), 'data','ser_file_nn.json')
+        from json_plus import Serializable
+        ser_result_lstm = Serializable.dumps(lstm_out)
+        ser_result_nn = Serializable.dumps(nn_out)
 
-    return net_result
+        with open(serialize_file_lstm, 'wb') as output:
+            json.dump(ser_result_lstm, output)
+        with open(serialize_file_nn, 'wb') as output:
+            json.dump(ser_result_nn, output)
+
+        # Store the (lstm, nnet) type result into a pickle
+        with open(picklefile, 'wb') as output:
+            pickle.dump((lstm_out,nn_out), output, pickle.HIGHEST_PROTOCOL)
+
+    return (lstm_out,nn_out)
 
 
 def test_nn_using_1_lstm_bit(test_dict, lstm, nnet):
@@ -188,6 +210,16 @@ def test_nn_using_1_lstm_bit(test_dict, lstm, nnet):
     :param test_dict:
     :return:
     """
+    from json_plus import Serializable
+
+    serialize_file_lstm = os.path.join(os.getcwd(), 'data','ser_file_lstm.json')
+    serialize_file_nn = os.path.join(os.getcwd(), 'data','ser_file_nn.json')
+    from json_plus import Serializable
+
+    with open(serialize_file_lstm, 'rb') as input:
+        lstm = Serializable.loads(json.load(input))
+    with open(serialize_file_nn, 'rb') as input:
+        nnet = Serializable.loads(json.load(input))
 
     # Send test data with trained model for testing
     validation_result = _test_nn_with_k_lstm_bits(test_dict, lstm, nnet, st=0, k=1)

@@ -29,6 +29,9 @@ class Serializable(object):
     @staticmethod
     def dumps(obj, pack_ndarray=True, tolerant=True):
         def custom(o):
+            if isinstance(o,tuple):
+                d = {'meta_class': 'tuple',
+                     'tuple': list(o)}
             if isinstance(o, Serializable):
                 module = o.__class__.__module__.split('campil.')[-1]
                 d = {'meta_class': '%s.%s' % (module,
@@ -86,6 +89,9 @@ class Serializable(object):
     def from_json(s, objectify=True, to_camarray=False):
         def hook(o):
             meta_module, meta_class = None, o.get('meta_class')
+            if meta_class == 'tuple':
+                # Tuple.
+                return tuple(o['tuple'])
             if meta_class in ('Datetime', 'datetime.datetime'):
                 # 'Datetime' included for backward compatibility
                 try:
@@ -228,7 +234,6 @@ class TestSerializable(unittest.TestCase):
         t = Serializable.loads(x)
         self.assertEqual(s, t)
 
-    @unittest.skip
     def test_tuple(self):
         # Not passing for now
         s = (12.42, 11, 'a',"testing")

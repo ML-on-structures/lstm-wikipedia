@@ -8,12 +8,12 @@ import time
 from lstm import LSTM
 from nn_base import DNN
 
-
 # Number of hidden layers in LSTM
 M = 12
 
 # Number of features present per revision
 Nf = 14
+
 
 def _learning_factor(weight_value):
     """
@@ -25,7 +25,11 @@ def _learning_factor(weight_value):
     return np.square(weight_value)
 
 
-def _train_nn_with_k_lstm_bits(data_list, k=None, N=1000, weighted_learning=False):
+def _train_nn_with_k_lstm_bits(data_list,
+                               k=None,
+                               N=1000,
+                               fix_bit_val=None,
+                               weighted_learning=False):
     """
 
     Get the items of dict of authors with each value containing:
@@ -62,7 +66,7 @@ def _train_nn_with_k_lstm_bits(data_list, k=None, N=1000, weighted_learning=Fals
     # NN will take input from it's inputs + k bits.
     # Value of middle layer in NN is set with different experiments (can be changed)
     # NN will give 1 output (for quality of revision)
-    nnet.initialize([k+12, k+12+(M/2), 1])
+    nnet.initialize([k + 12, k + 12 + (M / 2), 1])
 
     iter_ctr = N
     # Perform the following for N iterations
@@ -81,11 +85,15 @@ def _train_nn_with_k_lstm_bits(data_list, k=None, N=1000, weighted_learning=Fals
             if not yt:
                 continue
 
-            # Send x features to the wikipedia_lstm and collect output in Y
-            Y = lstm.forward(x_mat)
+            Y = np.array([])
+            if (k > 0 or k is None) and fix_bit_val is None:
+                # Run LSTM only if bits from LSTM are required
+                # Send x features to the wikipedia_lstm and collect output in Y
+                Y = lstm.forward(x_mat)
 
             # Set the input for NNet using k bits of Y
-            nnet_input = np.concatenate((Y[:k], fy))
+            nnet_input = np.concatenate((Y[:k], fy)) if fix_bit_val is None else np.concatenate(
+                (np.array(fix_bit_val), fy))
 
             # Sending input to NNet
             y = nnet.forward(nnet_input)
@@ -103,29 +111,35 @@ def _train_nn_with_k_lstm_bits(data_list, k=None, N=1000, weighted_learning=Fals
             # Now send the loss through NN backpropagation
             bp_res = nnet.backward_adadelta(dy)
 
-            # Generate input for LSTM backward round
-            back_el = np.zeros(Y.shape)
-            bp_res = np.resize(bp_res, Y.shape)
-            back_el[:k] = bp_res[:k]
+            if k < 0 or k is None:
+                # Send through LSTM only if its bits count
+                # Generate input for LSTM backward round
+                back_el = np.zeros(Y.shape)
+                bp_res = np.resize(bp_res, Y.shape)
+                back_el[:k] = bp_res[:k]
 
-            # Send the result on bit back through the LSTM
+                # Send the result on bit back through the LSTM
+                if weighted_learning:
+                    # Get update size using average of this revision's
+                    # char added and char subtracted (fy[3] and fy[4])
+                    update_size = np.average((fy[3], fy[4]))
+                    learning_factor = _learning_factor(update_size)
 
-            if weighted_learning:
-                # Get update size using average of this revision's
-                # char added and char subtracted (fy[3] and fy[4])
-                update_size = np.average((fy[3],fy[4]))
-                learning_factor = _learning_factor(update_size)
-            lstm.backward_adadelta(back_el, learning_factor=learning_factor)
+                lstm.backward_adadelta(back_el, learning_factor=learning_factor)
 
         # Print average error
-        iter_ctr+=1
-        if iter_ctr >= N/100:
+        iter_ctr += 1
+        if iter_ctr >= N / 100:
             avg_error = np.average(errors)
             print"Avg Err at %r iteration, for all users: %r " % (iteration, avg_error)
             iter_ctr = 0
 
-    return (lstm, nnet), errors
+        # Print on last iteration
+        if iteration == N - 1:
+            avg_error = np.average(errors)
+            print"Avg Err at %r iteration, for all users: %r " % (iteration, avg_error)
 
+    return (lstm, nnet), errors
 
 
 def _test_nn_with_k_lstm_bits(test_data, lstm, nnet, k=None):
@@ -172,9 +186,11 @@ def _test_nn_with_k_lstm_bits(test_data, lstm, nnet, k=None):
         # Check to ignore entry in absence of target value
         if not yt:
             continue
-
-        # Compute output from LSTM using 1-(n-1) revisions
-        Y = lstm.forward(x_mat)
+        Y = np.array([])
+        if k > 0 or k is None:
+            # Run LSTM only if bits from LSTM are required
+            # Compute output from LSTM using 1-(n-1) revisions
+            Y = lstm.forward(x_mat)
 
         # Set the input for NNet using k bits of Y
         nnet_input = np.concatenate((Y[:k], fy))
@@ -195,7 +211,7 @@ def _test_nn_with_k_lstm_bits(test_data, lstm, nnet, k=None):
 
         # Get update size using average of this revision's
         # char added and char subtracted (fy[3] and fy[4])
-        update_size = np.average((fy[3],fy[4]))
+        update_size = np.average((fy[3], fy[4]))
         label_weights = np.append(label_weights, update_size)
 
     print "Average validation error: ", np.average(errors)
@@ -207,8 +223,9 @@ def _test_nn_with_k_lstm_bits(test_data, lstm, nnet, k=None):
 def train_nn_using_k_lstm_bit(train_dict,
                               k=None,
                               N=1000,
+                              fix_bit_val=None,
                               store=False,
-                              picklefile=os.path.join(os.getcwd(), 'data','temp_model.pkl'),
+                              picklefile=os.path.join(os.getcwd(), 'data', 'temp_model.pkl'),
                               weighted_learning=False):
     """
     Train the LSTM and NNet combination using training dict.
@@ -223,15 +240,17 @@ def train_nn_using_k_lstm_bit(train_dict,
     train_items = train_dict.items()
 
     # Send for training using k as no. of bits to use
-    print "\n==Starting training== (Using %r iterations)"%(N)
+    print "\n==Starting training== (Using %r iterations)" % (N)
     t_start = time.clock()
-    (lstm_out, nn_out), errors = _train_nn_with_k_lstm_bits(train_items, k=k, N=N, weighted_learning=weighted_learning)
-    print "Training completed in %r seconds"%(time.clock()-t_start)
+    (lstm_out, nn_out), errors = _train_nn_with_k_lstm_bits(train_items, k=k, N=N, fix_bit_val=fix_bit_val,
+                                                            weighted_learning=weighted_learning)
+    print "Training completed in %r seconds" % (time.clock() - t_start)
 
     # Store the trained model into a pickle if store is True
     if store:
-        serialize_file_lstm = os.path.join(os.getcwd(), 'data','ser_file_lstm.json')
-        serialize_file_nn = os.path.join(os.getcwd(), 'data','ser_file_nn.json')
+        file_basic_name = 'trained_lstm_%r_nn_%r_%r' % (k, N, "weighted" if weighted_learning else "unweighted")
+        serialize_file_lstm = os.path.join(os.getcwd(), 'data', file_basic_name + 'lstm.json')
+        serialize_file_nn = os.path.join(os.getcwd(), 'data', file_basic_name + 'nn.json')
         from json_plus import Serializable
         ser_result_lstm = Serializable.dumps(lstm_out)
         ser_result_nn = Serializable.dumps(nn_out)
@@ -243,9 +262,73 @@ def train_nn_using_k_lstm_bit(train_dict,
 
         # Store the (lstm, nnet) type result into a pickle
         with open(picklefile, 'wb') as output:
-            pickle.dump((lstm_out,nn_out), output, pickle.HIGHEST_PROTOCOL)
+            pickle.dump((lstm_out, nn_out), output, pickle.HIGHEST_PROTOCOL)
 
-    return (lstm_out,nn_out)
+    return (lstm_out, nn_out)
+
+
+def _expand_to_all(items):
+    """
+    For NN only case, instead of using only last edit for training,
+    use each and every edit by every user. Using full data basically
+    :param train_items:
+    :return:
+    """
+    new_items = []
+    empty_mat = np.array([])
+    for cnt, (author, (x_mat, fy, yt)) in enumerate(items):
+        # Break into xmat
+        for row in x_mat:
+            new_items.append((author, (empty_mat, row[:-2], row[-1])))
+        new_items.append((author, (empty_mat, fy, yt)))
+
+    return new_items
+
+
+def train_nn_only(train_dict,
+                  N=1000,
+                  store=False,
+                  picklefile=os.path.join(os.getcwd(), 'data', 'temp_model.pkl'),
+                  weighted_learning=False):
+    """
+    Train the LSTM and NNet combination using training dict.
+
+    :param train_dict: dict containing entries of revisions per user
+    :param k: Number of bits to be used from LSTM
+    :param N: Number of iterations for network to train. Default is 1000
+    :param store: Boolean to decide whether to store result in pickle
+    :param picklefile: Pickle filename
+    :return: Returns a tuple consisting of lstm and neural net (lstm, nnet)
+    """
+    train_items = train_dict.items()
+
+    train_items = _expand_to_all(train_items)
+
+    # Send for training using k as no. of bits to use
+    print "\n==Starting training== (Using %r iterations)" % (N)
+    t_start = time.clock()
+    (lstm_out, nn_out), errors = _train_nn_with_k_lstm_bits(train_items, k=0, N=N, weighted_learning=weighted_learning)
+    print "Training completed in %r seconds" % (time.clock() - t_start)
+
+    # Store the trained model into a pickle if store is True
+    if store:
+        file_basic_name = 'trained_nn_only_%r_' % (N)
+        serialize_file_lstm = os.path.join(os.getcwd(), 'data', file_basic_name + 'lstm.json')
+        serialize_file_nn = os.path.join(os.getcwd(), 'data', file_basic_name + 'nn.json')
+        from json_plus import Serializable
+        ser_result_lstm = Serializable.dumps(lstm_out)
+        ser_result_nn = Serializable.dumps(nn_out)
+
+        with open(serialize_file_lstm, 'wb') as output:
+            json.dump(ser_result_lstm, output)
+        with open(serialize_file_nn, 'wb') as output:
+            json.dump(ser_result_nn, output)
+
+        # Store the (lstm, nnet) type result into a pickle
+        with open(picklefile, 'wb') as output:
+            pickle.dump((lstm_out, nn_out), output, pickle.HIGHEST_PROTOCOL)
+
+    return (lstm_out, nn_out)
 
 
 def _error_measurement(y_pred, y_true, label_weights):
@@ -259,16 +342,27 @@ def _error_measurement(y_pred, y_true, label_weights):
     """
 
     # Create classification buckets from labels
-    Y_pred = [1 if i<0.5 else 0 for i in y_pred]
-    Y_true = [1 if i<0.5 else 0 for i in y_true]
+    Y_pred = [1 if i < 0.5 else 0 for i in y_pred]
+    Y_true = [1 if i < 0.5 else 0 for i in y_true]
 
-    from sklearn.metrics import precision_recall_fscore_support
-    (precision, recall, fscore, support) = precision_recall_fscore_support(np.array(Y_true), np.array(Y_pred), average='binary')
+    print Y_pred
+    print Y_true
+    from sklearn.metrics import precision_recall_fscore_support, precision_score, recall_score,f1_score, fbeta_score
+    (precision, recall, fscore, support) = precision_recall_fscore_support(np.array(Y_true), np.array(Y_pred))
+    # average='binary')
+
+    prec_score = precision_score(np.array(Y_true), np.array(Y_pred))
+    rec_score = recall_score(np.array(Y_true), np.array(Y_pred))
+    fs = f1_score(np.array(Y_true), np.array(Y_pred))
+
+    print "Prec:", prec_score
+    print "Rec:", rec_score
+    print "F1-score:", fs
 
     return precision, recall, fscore
 
 
-def test_nn_using_1_lstm_bit(test_dict, lstm, nnet):
+def test_nn_using_k_lstm_bit(test_dict, lstm, nnet, k=None):
     """
 
     :param test_dict:
@@ -284,22 +378,51 @@ def test_nn_using_1_lstm_bit(test_dict, lstm, nnet):
     #     nnet = Serializable.loads(json.load(input))
 
     # Send test data with trained model for testing
-    errors, y_pred, y_true, label_weights = _test_nn_with_k_lstm_bits(test_dict, lstm, nnet, k=1)
+    errors, y_pred, y_true, label_weights = _test_nn_with_k_lstm_bits(test_dict, lstm, nnet, k=k)
 
     precision, recall, f_score = _error_measurement(y_pred, y_true, label_weights)
 
     print "Precision: ", precision, "\tRecall:", recall, "\tFscore: ", f_score
 
     print "Using value 0 for the bit"
-    #net_result = _combined_ops_nn_using_k_bits_test([item1], st=0,k=1, bit_val=0)
+    # net_result = _combined_ops_nn_using_k_bits_test([item1], st=0,k=1, bit_val=0)
     print "Using value 1 for the bit"
-    #net_result = _combined_ops_nn_using_k_bits_test([item1], st=0,k=1,bit_val=1)
+    # net_result = _combined_ops_nn_using_k_bits_test([item1], st=0,k=1,bit_val=1)
+
+    return locals()
+
+
+def test_nn_only(test_dict, lstm, nnet):
+    """
+
+    :param test_dict:
+    :return:
+    """
+    # serialize_file_lstm = os.path.join(os.getcwd(), 'data','ser_file_lstm.json')
+    # serialize_file_nn = os.path.join(os.getcwd(), 'data','ser_file_nn.json')
+    # from json_plus import Serializable
+    #
+    # with open(serialize_file_lstm, 'rb') as input:
+    #     lstm = Serializable.loads(json.load(input))
+    # with open(serialize_file_nn, 'rb') as input:
+    #     nnet = Serializable.loads(json.load(input))
+
+    # Send test data with trained model for testing
+    errors, y_pred, y_true, label_weights = _test_nn_with_k_lstm_bits(test_dict, lstm, nnet, k=0)
+
+    precision, recall, f_score = _error_measurement(y_pred, y_true, label_weights)
+
+    print "Precision: ", precision, "\tRecall:", recall, "\tFscore: ", f_score
+
+    print "Using value 0 for the bit"
+    # net_result = _combined_ops_nn_using_k_bits_test([item1], st=0,k=1, bit_val=0)
+    print "Using value 1 for the bit"
+    # net_result = _combined_ops_nn_using_k_bits_test([item1], st=0,k=1,bit_val=1)
 
     return locals()
 
 
 if __name__ == "__main__":
-
     print "Starting"
     nnet_pickle = os.path.join(os.getcwd(), 'data', 'nnet_pickle.pkl')
 

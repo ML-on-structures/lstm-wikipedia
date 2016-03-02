@@ -83,19 +83,28 @@ if __name__ == "__main__":
     # print postive, negative, ratio
     # print "Neg/All for only last revisoins of each user", ratio_only_last, 2*(ratio_only_last)*(1-ratio_only_last)
     # print "Neg/All for all revisions", ratio, 2*(ratio)*(1-ratio)
-    N = 1000
-    test_only = True
+    N = 50
+    test_only = False
     weighted_learning = True
     picklefile = os.path.join(os.getcwd(), 'data',
                               'trained_lstm_%r_%r.pkl' % ("weighted" if weighted_learning else "unweighted", N))
+    nn_pickle = os.path.join(os.getcwd(), 'data',
+                              'trained_nn_only_%r.pkl' % (30))
 
-    from training import train_nn_using_k_lstm_bit, test_nn_using_1_lstm_bit
+    from training import train_nn_using_k_lstm_bit, test_nn_using_k_lstm_bit, train_nn_only, test_nn_only
 
     if test_only:
         with open(picklefile, 'rb') as input:
             (lstm, nn) = pickle.load(input)
-        test_result = test_nn_using_1_lstm_bit(test, lstm, nn)
+        test_result = test_nn_using_k_lstm_bit(test, lstm, nn, k=1)
+        with open(nn_pickle, 'rb') as input:
+            (lstm, nn) = pickle.load(input)
+        test_result = test_nn_only(test, lstm, nn)
     else:
-        (lstm, nn) = train_nn_using_k_lstm_bit(training, k=1, store=True, N=N, picklefile=picklefile,
+        #(lstm, nn) = train_nn_using_k_lstm_bit(training, k=1, store=True, N=N, picklefile=picklefile,
+        #                                       weighted_learning=weighted_learning)
+        #test_result = test_nn_using_k_lstm_bit(test, lstm, nn, k=1)
+
+        (lstm, nn) = train_nn_only(training, store=True, N=N, picklefile=nn_pickle,
                                                weighted_learning=weighted_learning)
-        test_result = test_nn_using_1_lstm_bit(test, lstm, nn)
+        test_result = test_nn_only(test, lstm, nn)

@@ -84,7 +84,7 @@ if __name__ == "__main__":
     # print "Neg/All for only last revisoins of each user", ratio_only_last, 2*(ratio_only_last)*(1-ratio_only_last)
     # print "Neg/All for all revisions", ratio, 2*(ratio)*(1-ratio)
     N = 1000
-    test_only = False
+    test_only = True
     weighted_learning = True
     picklefile = os.path.join(os.getcwd(), 'data',
                               'trained_lstm_%r_%r.pkl' % ("weighted" if weighted_learning else "unweighted", N))

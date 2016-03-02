@@ -248,6 +248,26 @@ def train_nn_using_k_lstm_bit(train_dict,
     return (lstm_out,nn_out)
 
 
+def _error_measurement(y_pred, y_true, label_weights):
+    """
+    Provide measurements as requested for the given set of labels
+
+    :param y_pred: List of predicted labels
+    :param y_true: List of corresponding true labels
+    :param label_weights: Weights associated with each label depending on contribution's size
+    :return:
+    """
+
+    # Create classification buckets from labels
+    Y_pred = [1 if i<0.5 else 0 for i in y_pred]
+    Y_true = [1 if i<0.5 else 0 for i in y_true]
+
+    from sklearn.metrics import precision_recall_fscore_support
+    (precision, recall, fscore, support) = precision_recall_fscore_support(np.array(Y_true), np.array(Y_pred), average='binary')
+
+    return precision, recall, fscore
+
+
 def test_nn_using_1_lstm_bit(test_dict, lstm, nnet):
     """
 
@@ -264,8 +284,11 @@ def test_nn_using_1_lstm_bit(test_dict, lstm, nnet):
     #     nnet = Serializable.loads(json.load(input))
 
     # Send test data with trained model for testing
-    validation_result = _test_nn_with_k_lstm_bits(test_dict, lstm, nnet, st=0, k=1)
+    errors, y_pred, y_true, label_weights = _test_nn_with_k_lstm_bits(test_dict, lstm, nnet, k=1)
 
+    precision, recall, f_score = _error_measurement(y_pred, y_true, label_weights)
+
+    print "Precision: ", precision, "\tRecall:", recall, "\tFscore: ", f_score
 
     print "Using value 0 for the bit"
     #net_result = _combined_ops_nn_using_k_bits_test([item1], st=0,k=1, bit_val=0)

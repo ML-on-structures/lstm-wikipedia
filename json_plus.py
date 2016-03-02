@@ -39,6 +39,10 @@ class Serializable(object):
                 d = {'meta_class': 'datetime.datetime',
                      'date': o.isoformat()}
                 return d
+            elif isinstance(o,tuple):
+                d = {'meta_class': 'tuple',
+                     'tuple': list(o)}
+                return d
             elif isinstance(o, set):
                 d = {'meta_class': 'set',
                      'set': list(o)}
@@ -63,7 +67,7 @@ class Serializable(object):
                 return d
 
             # Normal Python types are unchanged
-            elif isinstance(o, (int, long, str, unicode, float, bool, list, tuple, dict)):
+            elif isinstance(o, (int, long, str, unicode, float, bool, list, dict)): # tuple, dict)):
                 return o
 
             # These two defaults are catch-all
@@ -94,6 +98,9 @@ class Serializable(object):
             elif meta_class == 'set':
                 # Set.
                 return set(o['set'])
+            elif meta_class == 'tuple':
+                # Tuple.
+                return tuple(o['tuple'])
             # Numpy arrays.
             elif meta_class == 'numpy.ndarray':
                 data = base64.b64decode(o['data'])
@@ -213,6 +220,24 @@ class TestSerializable(unittest.TestCase):
         print "Set representation:", x
         t = Serializable.loads(x)
         self.assertEqual(s, t)
+
+    def test_list(self):
+        s = ['a', 'b', 'c', {'a':213}]
+        x = Serializable.dumps(s)
+        print "Set representation:", x
+        t = Serializable.loads(x)
+        self.assertEqual(s, t)
+
+    @unittest.skip
+    def test_tuple(self):
+        # Not passing for now
+        s = (12.42, 11, 'a',"testing")
+        print type(s)
+        x = Serializable.dumps(s)
+        print "Tuple representation:", x
+        t = Serializable.loads(x)
+        self.assertEqual(s, t)
+
 
 if __name__ == '__main__':
     unittest.main()

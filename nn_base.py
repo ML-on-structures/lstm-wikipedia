@@ -101,12 +101,7 @@ class DNN(Serializable):
         returning a vector bo consisting of nnl[-1] values, each between 0 and 1.
         This function also sets internally all the activations a and outputs b."""
         bii = np.matrix(bi)
-        #print bii
-        self.input_shape = tuple(self.input_shape)# if type(self.input_shape)=="<type 'list'>" else self.input_shape
         assert bii.shape == self.input_shape, "expected shape: %r, actual shape: %r" % (self.input_shape, bii.shape)
-        if not bii.shape == self.input_shape:
-            print "Need to reshape bii"
-            bii = bii.reshape(self.input_shape)
         self.b[0][0, 0:self.nnl[0]] = bii
         # Propagates from layer n to layer n + 1.
         for n in range(self.num_layers):

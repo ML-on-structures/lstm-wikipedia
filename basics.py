@@ -86,7 +86,8 @@ if __name__ == "__main__":
     N = 1000
     test_only = False
     weighted_learning = True
-    picklefile = os.path.join(os.getcwd(), 'data', 'trained_lstm_%r_%r.pkl' % ("weighted" if weighted_learning else "unweighted",N))
+    picklefile = os.path.join(os.getcwd(), 'data',
+                              'trained_lstm_%r_%r.pkl' % ("weighted" if weighted_learning else "unweighted", N))
 
     from training import train_nn_using_k_lstm_bit, test_nn_using_1_lstm_bit
 

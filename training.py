@@ -15,9 +15,19 @@ M = 12
 # Number of features present per revision
 Nf = 14
 
+def _learning_factor(weight_value):
+    """
+    Provide a learning factor which is a function of
+    the size of update
+    :param weight_value: Size of update
+    :return: Learning factor for the update
+    """
+    return np.square(weight_value)
+
 
 def _train_nn_with_k_lstm_bits(data_list, k=None, N=1000, weighted_learning=False):
     """
+
     Get the items of dict of authors with each value containing:
      author, (matrix_of 0:n-1 revisions with features and quality,
       features of nth revision without quality,
@@ -37,9 +47,10 @@ def _train_nn_with_k_lstm_bits(data_list, k=None, N=1000, weighted_learning=Fals
 
     :param data_list: This list contains all items in structure (author, (x_mat, fy, yt))
     :param k: Number of bits to be used
+    :param N: Number of iterations for training
+    :param weighted_learning: Boolena to control weighted learning. Default is False
     :return: (Trained LSTM, Trained NNet), List of errors
     """
-
 
     # Initialize an LSTM
     lstm = LSTM()
@@ -103,7 +114,7 @@ def _train_nn_with_k_lstm_bits(data_list, k=None, N=1000, weighted_learning=Fals
                 # Get update size using average of this revision's
                 # char added and char subtracted (fy[3] and fy[4])
                 update_size = np.average((fy[3],fy[4]))
-                learning_factor = np.square(update_size);
+                learning_factor = _learning_factor(update_size)
             lstm.backward_adadelta(back_el, learning_factor=learning_factor)
 
         # Print average error
@@ -117,54 +128,80 @@ def _train_nn_with_k_lstm_bits(data_list, k=None, N=1000, weighted_learning=Fals
 
 
 
-def _test_nn_with_k_lstm_bits(test_data, lstm, nnet, st=0, k=None):
+def _test_nn_with_k_lstm_bits(test_data, lstm, nnet, k=None):
     """
+
     Get the dict of authors as keys and values in form:
      (matrix_of 0:n-1 revisions with features and quality,
       features of nth revision without quality,
       quality of nth revision
     )
 
-    Now pass it through LSTM and Neural net combination
-    :param json_item:
-    :return:
+    Now pass it through trained LSTM and Neural net combination which has been
+    For each author,
+        run the author's data (0-n-1) revisions
+        through the LSTM. From the LSTM extract k bits of output and
+        send them along with nth revision's features to the Neural Net.
+        Output from the Neural Net is then compared with our target value
+        and loss is reported.
+        Add the loss, true label and predicted label to respective lists
+        Also add a weighing factor to list of weights which corresponds
+        to the size of update
+
+    :param test_data: Dict containing items in structure (author, (x_mat, fy, yt))
+    :param lstm: Trained LSTM
+    :param nnet: Trained Neural Net
+    :param k: Number of bits to be used
+    :return: Errors, True labels, Predicted labels
     """
+
+    # Get items from dict
     items = test_data.items()
-    errors = np.array(0.0)
+
+    # Create empty lists for errors, lables and weights
+    errors = np.array([])
+    y_true = np.array([])
+    y_pred = np.array([])
+    label_weights = np.array([])
 
     print "\n\n==Validation==\n\n"
+
+    # Start the process for each author
     for cnt, (author, (x_mat, fy, yt)) in enumerate(items):
 
+        # Check to ignore entry in absence of target value
         if not yt:
             continue
 
+        # Compute output from LSTM using 1-(n-1) revisions
         Y = lstm.forward(x_mat)
 
-        if st:
-            if not k:
-                k=0
-            nnet_input = np.concatenate((Y[st:st+k], fy))
-        else:
-            nnet_input = np.concatenate((Y[:k], fy))
-            st=0
-            if not k:
-                k=0
-        #nnet_input = np.concatenate((Y[:k], fy))
+        # Set the input for NNet using k bits of Y
+        nnet_input = np.concatenate((Y[:k], fy))
 
-        # Sending wikipedia_lstm outputs combined with last revisions features to Nnet
+        # Sending LSTM output bit combined with last revisions features to Nnet
         y = nnet.forward(nnet_input)
 
         # Quality normalized
         yt = 1.0 * (yt + 1.0) / 2.0
 
+        # Measure error
         e = np.sum((y - yt) ** 2)
-        errors = np.append(errors, e)
 
-        #print"Err for %r user : %r" %(cnt, e)
+        # Append error and target entries into corresponding lists
+        errors = np.append(errors, e)
+        y_pred = np.append(y_pred, y)
+        y_true = np.append(y_true, yt)
+
+        # Get update size using average of this revision's
+        # char added and char subtracted (fy[3] and fy[4])
+        update_size = np.average((fy[3],fy[4]))
+        label_weights = np.append(label_weights, update_size)
 
     print "Average validation error: ", np.average(errors)
 
-    return np.average(errors)
+    # Return the computed labels along with errors, true labels and weights
+    return errors, y_pred, y_true, label_weights
 
 
 def train_nn_using_k_lstm_bit(train_dict,

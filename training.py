@@ -9,10 +9,13 @@ from lstm import LSTM
 from nn_base import DNN
 
 # Number of hidden layers in LSTM
+from serializer import data_to_json
+
 M = 12
 
 # Number of features present per revision
-Nf = 14
+Nf_quality = 14
+Nf_existence = 15
 
 
 def _learning_factor(weight_value):
@@ -28,6 +31,7 @@ def _learning_factor(weight_value):
 def _train_nn_with_k_lstm_bits(data_list,
                                k=None,
                                N=1000,
+                               quality=True,
                                fix_bit_val=None,
                                weighted_learning=False):
     """
@@ -56,10 +60,12 @@ def _train_nn_with_k_lstm_bits(data_list,
     :return: (Trained LSTM, Trained NNet), List of errors
     """
 
+    Nf = Nf_quality if quality else Nf_existence
     # Initialize an LSTM
     lstm = LSTM()
     lstm.initialize(Nf, M)
     learning_factor = 1.0
+
     # Initialize a Neural Network
     nnet = DNN()
 
@@ -98,8 +104,9 @@ def _train_nn_with_k_lstm_bits(data_list,
             # Sending input to NNet
             y = nnet.forward(nnet_input)
 
-            # Quality normalized
-            yt = 1.0 * (yt + 1.0) / 2.0
+            if (k>0 or k is None) and quality:
+                # Quality normalized
+                yt = 1.0 * (yt + 1.0) / 2.0
 
             # Measure squared loss
             e = np.sum((y - yt) ** 2)
@@ -142,7 +149,7 @@ def _train_nn_with_k_lstm_bits(data_list,
     return (lstm, nnet), errors
 
 
-def _test_nn_with_k_lstm_bits(test_data, lstm, nnet, k=None):
+def _test_nn_with_k_lstm_bits(test_data, lstm, nnet, k=None, quality=True):
     """
 
     Get the dict of authors as keys and values in form:
@@ -198,8 +205,9 @@ def _test_nn_with_k_lstm_bits(test_data, lstm, nnet, k=None):
         # Sending LSTM output bit combined with last revisions features to Nnet
         y = nnet.forward(nnet_input)
 
-        # Quality normalized
-        yt = 1.0 * (yt + 1.0) / 2.0
+        if k>0 or k is None and quality:
+            # Quality normalized
+            yt = 1.0 * (yt + 1.0) / 2.0
 
         # Measure error
         e = np.sum((y - yt) ** 2)
@@ -224,6 +232,7 @@ def train_nn_using_k_lstm_bit(train_dict,
                               k=None,
                               N=1000,
                               fix_bit_val=None,
+                              quality = True,
                               store=False,
                               picklefile=os.path.join(os.getcwd(), 'data', 'temp_model.pkl'),
                               weighted_learning=False):
@@ -238,12 +247,13 @@ def train_nn_using_k_lstm_bit(train_dict,
     :return: Returns a tuple consisting of lstm and neural net (lstm, nnet)
     """
     train_items = train_dict.items()
+    train_items = _rebalance_data(train_items)
 
     # Send for training using k as no. of bits to use
-    print "\n==Starting training== (Using %r iterations)" % (N)
+    print "\n==Starting training== (Using %r iterations) and k=%r" % (N, k)
     t_start = time.clock()
     (lstm_out, nn_out), errors = _train_nn_with_k_lstm_bits(train_items, k=k, N=N, fix_bit_val=fix_bit_val,
-                                                            weighted_learning=weighted_learning)
+                                                            weighted_learning=weighted_learning, quality=quality)
     print "Training completed in %r seconds" % (time.clock() - t_start)
 
     # Store the trained model into a pickle if store is True
@@ -280,8 +290,34 @@ def _expand_to_all(items):
         # Break into xmat
         for row in x_mat:
             new_items.append((author, (empty_mat, row[:-2], row[-1])))
+        yt = 1.0 * (yt + 1.0) / 2.0
         new_items.append((author, (empty_mat, fy, yt)))
 
+    return new_items
+
+
+def _rebalance_data(items):
+    """
+    Rebalance the biased data to a balanced set where probability
+    of each label is 0.5
+
+    While using all negative results, add randomly selected equal
+    number of results from other set
+
+    :param train_items:
+    :return:
+    """
+    neg_items = [(author, (x_mat, fy, yt)) for (author, (x_mat, fy, yt)) in items if yt<0.5]
+    pos_items = [(author, (x_mat, fy, yt)) for (author, (x_mat, fy, yt)) in items if yt>0.5]
+    pos_items = random.sample(pos_items, len(neg_items))
+
+    new_items = neg_items+pos_items
+    print len(neg_items)
+    print len(new_items)
+
+    # Shuffle 5 times to ensure mix of data
+    for i in range(5):
+        np.random.shuffle(new_items)
     return new_items
 
 
@@ -303,6 +339,7 @@ def train_nn_only(train_dict,
     train_items = train_dict.items()
 
     train_items = _expand_to_all(train_items)
+    train_items = _rebalance_data(train_items)
 
     # Send for training using k as no. of bits to use
     print "\n==Starting training== (Using %r iterations)" % (N)
@@ -312,17 +349,17 @@ def train_nn_only(train_dict,
 
     # Store the trained model into a pickle if store is True
     if store:
-        file_basic_name = 'trained_nn_only_%r_' % (N)
-        serialize_file_lstm = os.path.join(os.getcwd(), 'data', file_basic_name + 'lstm.json')
-        serialize_file_nn = os.path.join(os.getcwd(), 'data', file_basic_name + 'nn.json')
-        from json_plus import Serializable
-        ser_result_lstm = Serializable.dumps(lstm_out)
-        ser_result_nn = Serializable.dumps(nn_out)
-
-        with open(serialize_file_lstm, 'wb') as output:
-            json.dump(ser_result_lstm, output)
-        with open(serialize_file_nn, 'wb') as output:
-            json.dump(ser_result_nn, output)
+        # file_basic_name = 'trained_nn_only_%r_' % (N)
+        # serialize_file_lstm = os.path.join(os.getcwd(), 'data', file_basic_name + 'lstm.json')
+        # serialize_file_nn = os.path.join(os.getcwd(), 'data', file_basic_name + 'nn.json')
+        # from json_plus import Serializable
+        # ser_result_lstm = Serializable.dumps(lstm_out)
+        # ser_result_nn = Serializable.dumps(nn_out)
+        #
+        # with open(serialize_file_lstm, 'wb') as output:
+        #     json.dump(ser_result_lstm, output)
+        # with open(serialize_file_nn, 'wb') as output:
+        #     json.dump(ser_result_nn, output)
 
         # Store the (lstm, nnet) type result into a pickle
         with open(picklefile, 'wb') as output:
@@ -362,7 +399,7 @@ def _error_measurement(y_pred, y_true, label_weights):
     return precision, recall, fscore
 
 
-def test_nn_using_k_lstm_bit(test_dict, lstm, nnet, k=None):
+def test_nn_using_k_lstm_bit(test_dict, lstm, nnet, k=None, quality=True):
     """
 
     :param test_dict:
@@ -378,7 +415,7 @@ def test_nn_using_k_lstm_bit(test_dict, lstm, nnet, k=None):
     #     nnet = Serializable.loads(json.load(input))
 
     # Send test data with trained model for testing
-    errors, y_pred, y_true, label_weights = _test_nn_with_k_lstm_bits(test_dict, lstm, nnet, k=k)
+    errors, y_pred, y_true, label_weights = _test_nn_with_k_lstm_bits(test_dict, lstm, nnet, k=k, quality=quality)
 
     precision, recall, f_score = _error_measurement(y_pred, y_true, label_weights)
 
@@ -421,11 +458,39 @@ def test_nn_only(test_dict, lstm, nnet):
 
     return locals()
 
+def test_oracle(test_dict):
+    """
+
+    :param test_dict:
+    :return:
+    """
+    # serialize_file_lstm = os.path.join(os.getcwd(), 'data','ser_file_lstm.json')
+    # serialize_file_nn = os.path.join(os.getcwd(), 'data','ser_file_nn.json')
+    # from json_plus import Serializable
+    #
+    # with open(serialize_file_lstm, 'rb') as input:
+    #     lstm = Serializable.loads(json.load(input))
+    # with open(serialize_file_nn, 'rb') as input:
+    #     nnet = Serializable.loads(json.load(input))
+
+    # Send test data with trained model for testing
+    y_true = [0 if int(yt)<0 else 1 for (author, (x_mat, fy, yt)) in test_dict.items()]
+    y_pred = [random.choice([0,1]) for i in range(len(y_true))]
+    label_weights = [1.0 for i in range(len(y_true))]
+    #errors, y_pred, y_true, label_weights = _test_nn_with_k_lstm_bits(test_dict, lstm, nnet, k=0)
+
+    precision, recall, f_score = _error_measurement(y_pred, y_true, label_weights)
+
+    print "Precision: ", precision, "\tRecall:", recall, "\tFscore: ", f_score
+
+    print "Using value 0 for the bit"
+    # net_result = _combined_ops_nn_using_k_bits_test([item1], st=0,k=1, bit_val=0)
+    print "Using value 1 for the bit"
+    # net_result = _combined_ops_nn_using_k_bits_test([item1], st=0,k=1,bit_val=1)
+
+    return locals()
+
 
 if __name__ == "__main__":
     print "Starting"
-    nnet_pickle = os.path.join(os.getcwd(), 'data', 'nnet_pickle.pkl')
 
-    # Read back the pickle to act as validation during use
-    with open(nnet_pickle, 'rb') as input:
-        net_result = pickle.load(input)

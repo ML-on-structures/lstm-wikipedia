@@ -46,10 +46,10 @@ def create_user_last_revision_existence_data(data_dict):
     data_to_use = data_dict.copy()
     items = data_to_use.items()
     print "Items: ", len(items)
-    print "Shape before-- x_mat: %r, fy: %r"%(items[0][1][0].shape, items[0][1][1].shape)
+    print "Shape before-- x_mat: %r, fy: %r" % (items[0][1][0].shape, items[0][1][1].shape)
 
-    largest_xmat = max([len(x_mat) for (author,(x_mat, fy, yt)) in items])
-    print "Largest xmat ",largest_xmat
+    largest_xmat = max([len(x_mat) for (author, (x_mat, fy, yt)) in items])
+    print "Largest xmat ", largest_xmat
     for cnt, (author, (x_mat, fy, yt)) in enumerate(items):
         # # Look at the time from previous user contribution.
         # # If that time is greater than threshold,
@@ -61,13 +61,13 @@ def create_user_last_revision_existence_data(data_dict):
 
         # Build solely on truth
         # So every entry from 0- (n-1) gets 0 label meaning it is not the last revisions
-        x_mat = np.array([np.concatenate((i,[0])) for i in x_mat])
+        x_mat = np.array([np.concatenate((i, [0])) for i in x_mat])
 
         # Last entry gets 0 only if x_mat was of size 49 in size, otherwise 1
-        yt = 0 if len(x_mat)==49 else 1
+        yt = 0 if len(x_mat) == 49 else 1
 
         # Append to new list
-        new_items[author] =  (x_mat, fy, yt)
+        new_items[author] = (x_mat, fy, yt)
 
     print "New Items: ", len(new_items)
 
@@ -116,7 +116,7 @@ if __name__ == "__main__":
     training, test = load_data(files=True)
 
     objective = "quality"
-    #objective = "existence"
+    # objective = "existence"
 
     #
     #
@@ -131,16 +131,18 @@ if __name__ == "__main__":
     from training import train_nn_using_k_lstm_bit, test_nn_using_k_lstm_bit, train_nn_only, test_nn_only, test_oracle
 
     N = 5000
-    k=3
+    k = 12
     test_only = False
-    weighted_learning = True
+    weighted_learning = False
+    balanced = False
 
-    if objective=="quality":
+    if objective == "quality":
         picklefile = os.path.join(os.getcwd(), 'data',
-                                  'trained_lstm_k%r_%r_%r.pkl' % (k,"weighted" if weighted_learning else "unweighted", N))
+                                  'trained_lstm_k%r_%r_%r_%r.pkl' % (
+                                      k, "weighted" if weighted_learning else "unweighted",
+                                      "balance" if balanced else "unbalanced", N))
         nn_pickle = os.path.join(os.getcwd(), 'data',
                                  'trained_nn_only_%r.pkl' % (N))
-
 
         if test_only:
             with open(picklefile, 'rb') as input:
@@ -151,26 +153,25 @@ if __name__ == "__main__":
             test_result = test_nn_only(test, lstm, nn)
         else:
             # (lstm, nn) = train_nn_using_k_lstm_bit(training, k=k, store=True, N=N, picklefile=picklefile,
-            #                                       weighted_learning=weighted_learning)
+            #                                        weighted_learning=weighted_learning, balanced=balanced)
             # test_result = test_nn_using_k_lstm_bit(test, lstm, nn, k=k)
 
-            # (lstm, nn) = train_nn_only(training, store=True, N=N, picklefile=nn_pickle,
-            #                             weighted_learning=weighted_learning)
-            # test_result = test_nn_only(test, lstm, nn)
+            (lstm, nn) = train_nn_only(training, store=True, N=N, picklefile=nn_pickle,
+                                        weighted_learning=weighted_learning)
+            test_result = test_nn_only(test, lstm, nn)
 
             print "Oracle Round"
             oracle_result = test_oracle(test)
 
-    elif objective=="existence":
+    elif objective == "existence":
         picklefile = os.path.join(os.getcwd(), 'data',
-                                  'existence_trained_lstm_%r_%r.pkl' % ("weighted" if weighted_learning else "unweighted", N))
+                                  'existence_trained_lstm_%r_%r.pkl' % (
+                                      "weighted" if weighted_learning else "unweighted", N))
         nn_pickle = os.path.join(os.getcwd(), 'data',
                                  'existence_trained_nn_only_%r.pkl' % (N))
         training_new = create_user_last_revision_existence_data(training)
         test_new = create_user_last_revision_existence_data(test)
 
         (lstm, nn) = train_nn_using_k_lstm_bit(training_new, k=1, store=True, N=N, picklefile=picklefile,
-                                              weighted_learning=weighted_learning, quality=False)
+                                               weighted_learning=weighted_learning, quality=False)
         test_result = test_nn_using_k_lstm_bit(test_new, lstm, nn, k=1, quality=False)
-
-

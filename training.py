@@ -235,7 +235,8 @@ def train_nn_using_k_lstm_bit(train_dict,
                               quality = True,
                               store=False,
                               picklefile=os.path.join(os.getcwd(), 'data', 'temp_model.pkl'),
-                              weighted_learning=False):
+                              weighted_learning=False,
+                              balanced=True):
     """
     Train the LSTM and NNet combination using training dict.
 
@@ -247,10 +248,12 @@ def train_nn_using_k_lstm_bit(train_dict,
     :return: Returns a tuple consisting of lstm and neural net (lstm, nnet)
     """
     train_items = train_dict.items()
-    train_items = _rebalance_data(train_items)
+    if balanced:
+        train_items = _rebalance_data(train_items)
 
     # Send for training using k as no. of bits to use
     print "\n==Starting training== (Using %r iterations) and k=%r" % (N, k)
+    print "Statuses-- Weighted: %r, Balanced %r"%(weighted_learning, balanced)
     t_start = time.clock()
     (lstm_out, nn_out), errors = _train_nn_with_k_lstm_bits(train_items, k=k, N=N, fix_bit_val=fix_bit_val,
                                                             weighted_learning=weighted_learning, quality=quality)
@@ -343,6 +346,8 @@ def train_nn_only(train_dict,
 
     # Send for training using k as no. of bits to use
     print "\n==Starting training== (Using %r iterations)" % (N)
+    print "Statuses-- Weighted: %r"%(weighted_learning,)
+
     t_start = time.clock()
     (lstm_out, nn_out), errors = _train_nn_with_k_lstm_bits(train_items, k=0, N=N, weighted_learning=weighted_learning)
     print "Training completed in %r seconds" % (time.clock() - t_start)

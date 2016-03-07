@@ -7,7 +7,7 @@ from scipy import stats
 import numpy as np
 
 from basics import load_data
-from training import test_nn_using_k_lstm_bit
+from learning import test_nn_using_k_lstm_bit
 import matplotlib.pyplot as plt
 
 FEATURES = {
@@ -182,21 +182,34 @@ def meaning_of_bits(data, lstm, nn, k):
 
 
 if __name__ == "__main__":
-    training, test = load_data(files=True)
+    _, test = load_data(files=True)
 
     N = 5000
-    k = 12
+    k = 1232
     test_only = False
-    weighted_learning = True
+    weighted_learning = False
+    balanced = False
 
     picklefile = os.path.join(os.getcwd(), 'results',
                               'trained_lstm_k%r_%r_%r.pkl' % (k, "weighted" if weighted_learning else "unweighted", N))
 
     known_pickle = os.path.join(os.getcwd(), 'results', 'nnet_pickle_5000.pkl')
 
+    picklefile = os.path.join(os.getcwd(), 'results',
+                              'trained_lstm_k%r_%r_%r_%r.pkl' % (
+                                  k, "weighted" if weighted_learning else "unweighted",
+                                  "balance" if balanced else "unbalanced", N))
+    nn_pickle = os.path.join(os.getcwd(), 'results',
+                             'trained_nn_only_%r.pkl' % (N))
+
+try:
     with open(picklefile, 'rb') as input:
         (lstm, nn) = pickle.load(input)
 
     # with open(known_pickle, 'rb') as input:
     #     (lstm, nn) = pickle.load(input)
     meaning = meaning_of_bits(test, lstm, nn, k=k)
+
+except IOError, e:
+    print e
+    print "Problem with loading file"

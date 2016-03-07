@@ -1,10 +1,17 @@
 import json
 import os
 import random
+from pprint import pprint
+
 import numpy as np
 import time
+
+from datetime import datetime
 from pydal import DAL, Field
 from serializer import json_to_data, data_to_json
+from wikipedia import WikiFetch
+
+# Some constants to be used in DataAccess operations
 DATE_PATTERN = "%Y-%m-%dT%H:%M:%SZ"  # "%Y-%b%a, %d %b %Y %H:%M:%S %z"
 START_TIME = "2012-01-01T01:01:01Z"
 ALPHA = 0.5
@@ -44,19 +51,20 @@ def _normalize_inputs(features, gen_values, last_two=False):
     this range.
 
     Each input is normalized in its own way.
+    Features:
+            time_prev_user
+            time_prev_page
+            time_prev_user_page
+            chars_added
+            chars_removed
+            spread
+            position_in_page
+            time_in_day
+            day_of_week
+            rev_comment_length
+            upper_lower_ratio
+            digit_total_ratio
 
-        vect_y_features = [last_row.time_prev_user,
-                           last_row.time_prev_page,
-                           last_row.time_prev_user_page,
-                           last_row.chars_added,
-                           last_row.chars_removed,
-                           last_row.spread,
-                           last_row.position_in_page,
-                           last_row.time_in_day,
-                           last_row.day_of_week,
-                           last_row.rev_comment_length,
-                           last_row.upper_lower_ratio,
-                           last_row.digit_total_ratio]
 
     :param features: Features of entry
     :param gen_values: General values to be used for normalization
@@ -66,7 +74,7 @@ def _normalize_inputs(features, gen_values, last_two=False):
     norm_list = []
     # Time values - 0,1,2
     # Clip them
-    #print features
+    # print features
     norm_list = [np.clip(i, 0.0, 1.0) for i in features[:3]]
 
     # Char measurement -3,4
@@ -89,7 +97,7 @@ def _normalize_inputs(features, gen_values, last_two=False):
     # sin(2*pi*h/24)
     new_val = np.sin(2 * np.pi * features[7] / 24)
     # Put in [0,1] range
-    norm_list.append(1.0*(new_val+1.0)/2.0)
+    norm_list.append(1.0 * (new_val + 1.0) / 2.0)
 
     # Day of week - 8
     # Divide by 7
@@ -126,13 +134,41 @@ def _normalize_inputs(features, gen_values, last_two=False):
 
 
 
+def _operate_on_contributions(c, username):
+    """
+    Operate on the contributions sent for a user.
+
+    :param contributions:
+    :return:
+    """
+    w = WikiFetch
+    user_revision = w.fetch_revisions_for_page(pageid=c['pageid'],
+                                               start_rev=c['revid'],
+                                               chunk_size=1, )
+
+    prev_revision = w.fetch_revisions_for_page(pageid=c['pageid'],
+                                               start_rev=c['revid'],
+                                               chunk_size=1,
+                                               direction="older",  # Gets older revisions
+                                               exclude=username)  # excludes same user
+
+    next_revisions = w.fetch_revisions_for_page(pageid=c['pageid'],
+                                                start_rev=c['revid'],
+                                                chunk_size=10,
+                                                direction="newer",  # Gets later revisions
+                                                exclude=username)
+
+    return user_revision, prev_revision, next_revisions
+
+
+
 class DataAccess:
     """
 
     """
 
     def __init__(self):
-        self.db = DAL('sqlite://storage4.sqlite', folder="results")
+        self.db = DAL('sqlite://storage4.sqlite', folder="data")
 
         self.authors = self.db.define_table('authors',
                                             Field('username', unique=True),
@@ -170,8 +206,228 @@ class DataAccess:
                                               Field('quality', 'double'),
                                               migrate=False
                                               )
-        
-    def load_fresh_from_db(self, store=True,limit_users=50):
+
+    def collect_contributions(self):
+        """
+        Get upto 50 first contributions of a user.
+        Users are already pre-fetched into the DB.
+        For each user in the limit, get the revisions 1-n with max n being 50.
+
+        While getting each revision, perform operations to extract features out of the revisions.
+        Features to fetch are as follows:
+            Time features:
+                Time from user's previous edit
+                Time from previous contribution on revision's page
+                Time from user's previous edit on this page
+
+            Character features:
+                Characters added
+                Characters removed
+                Spread within page
+                Position in page
+                Added text
+                UpperCase/LowerCase ratio
+                Digit/Total ratio
+
+            Action features:
+                Revision comment length
+                Time in day (UTC)
+                Day of week
+
+            Future features:
+                Time to next revision on page
+                Quality of revision
+
+        This function updates the revision entries into 'revisions_extended' table
+        To identify an author with revisions collected, the boolean value 'completed' in table 'authors'
+        is set to True if the user's edits are stored.
+
+        :return:
+        """
+
+        # Object for WikiFetch class (to communicate with Wikipedia)
+        w = WikiFetch()
+
+        # Get users from the table. Controlled by 'cleaned' and 'completed'
+        q = (
+                db.authors.user_since > START_TIME) & (
+                db.authors.contributions > 3) & (
+                db.authors.cleaned == True) & (
+                db.authors.completed == False
+            )
+        users = self.db(q).select(limitby=(851, 1000))
+
+        # Get revisions for each user from Wikipedia
+        for i in users:
+
+            # This piece of code is kept in a try-except block because
+            # it is very long running and sometimes due to unknown
+            # errors it tends to consider some DB fields with Nan
+            # values even when the code works totally fine.
+            try:
+                # Basic user values available in 'authors' table
+                username = i['username']
+                cont_count = i['contributions']
+
+                # Initialize a boolean to control completion of record
+                completed = True
+
+                # Get the contributions for this user.
+                # Getting up to first 50
+                # Using the method written in wikipedia.py
+                # This call returns a list of contributions by this author
+                # with each entry of that list being a dict
+                contributions = w.get_user_contributions(username=username,
+                                                         cont_limit=50, )
+
+                # Don't operate if it has less than 3 revisions
+                if len(contributions) < 3:
+                    continue
+
+                # Iterate over these contibutions and get their features
+                for c, v in enumerate(contributions):
+                    # Each contribution must be inserted into the database now with all supporting values
+                    # So at this stage, we merge basic fields of the revision with
+                    # extracted features using a set of methods.
+
+                    # To control previous revision in future calculations
+                    c_before = contributions[c - 1] if c else None
+
+                    # Wikipedia PageID of the revision under consideration
+                    pageid = v.get('pageid')
+
+                    # curr is this revision
+                    # prev is previous revision by another author
+                    # following is list of next (upto 10) revisions by different authors
+                    curr, prev, following = _operate_on_contributions(v, username=username)
+
+                    # Some checks since web data can often lead to unknown errors. (eg 500 from Wikipedia server)
+                    # Current revision and previous revision by another author on page are
+                    # important for quality measurements. So make sure they exist
+                    if not curr or not prev:
+                        completed = False
+                        break
+
+                    # Basic features of current revision
+                    # To be ussed in collecting features
+                    curr = curr[0]
+                    t_curr = datetime.strptime(curr.get('timestamp'), DATE_PATTERN)
+                    content_curr = curr.get('*', '')
+                    parent_curr = curr.get('parentid', None)
+
+                    parent_rev = w.fetch_revisions_for_page(pageid=pageid,
+                                                            start_rev=parent_curr,
+                                                            chunk_size=1, )
+                    if not parent_rev:
+                        completed = False
+                        break
+                    # print parent_rev
+                    parent_rev = parent_rev[0]
+                    content_parent = parent_rev.get('*', '')
+                    t_prev_page = datetime.strptime(parent_rev.get('timestamp'), DATE_PATTERN)
+
+                    next_rev = w.fetch_revisions_for_page(pageid=pageid,
+                                                          start_rev=curr['revid'],
+                                                          chunk_size=2,
+                                                          direction="newer", )
+                    if len(next_rev) < 2:
+                        completed = False
+                        break
+
+                    next_rev = next_rev[1]
+                    t_next_page = datetime.strptime(next_rev.get('timestamp'), DATE_PATTERN)
+
+                    # Get distances from parent revision
+                    feature_dict = _get_distances(content_curr, content_parent)
+                    feature_dict['rev_comment_length'] = len(curr.get('comment', ''))
+                    feature_dict['time_in_day'] = t_curr.hour
+                    feature_dict['day_of_week'] = t_curr.weekday()
+
+                    # Time delta values
+
+                    # Previous on page
+                    feature_dict['time_prev_page'] = (t_curr - t_prev_page).total_seconds() / (
+                        1.0 * SECS_IN_HR * HRS_IN_WEEK)
+
+                    # Next on page
+                    feature_dict['time_next_page'] = (t_next_page - t_curr).total_seconds() / (
+                        1.0 * SECS_IN_HR * HRS_IN_WEEK)
+
+                    # Previous by user
+                    contribution_before = w.get_user_contributions(username=username,
+                                                                   cont_limit=2,
+                                                                   start_time=curr.get('timestamp'),
+                                                                   direction="older")
+
+                    t_user_prev = datetime.strptime(contribution_before[1].get('timestamp'), DATE_PATTERN) if len(
+                        contribution_before) > 1 else 0
+
+                    feature_dict['time_prev_user'] = (t_curr - t_user_prev).total_seconds() / (
+                        1.0 * SECS_IN_HR * HRS_IN_WEEK) if t_user_prev else 0.0
+
+                    # Previous by user on page
+                    t_user_page_prev = _get_previous_by_user_on_page(username=username,
+                                                                     page=pageid,
+                                                                     revision=curr.get('revid', None))
+
+                    feature_dict['time_prev_user_page'] = (t_curr - t_user_page_prev).total_seconds() / (
+                        1.0 * SECS_IN_HR * HRS_IN_WEEK) if t_user_page_prev else 0.0
+
+                    feature_dict['revid'] = curr.get('revid')
+                    feature_dict['pageid'] = pageid
+                    feature_dict['username'] = username
+                    feature_dict['rev_timestamp'] = t_curr
+                    feature_dict['userid'] = curr['userid']
+                    feature_dict['rev_content'] = content_curr
+                    feature_dict['rev_comment'] = curr.get('comment', '')
+                    feature_dict['rev_size'] = curr['size']
+
+                    # Measure quality for current revision
+                    content_prev = prev[0].get('*', '')
+                    qjs = []
+                    ws = []
+                    if len(following):
+                        for pos, v in enumerate(following):
+                            content_fol = v.get('*', '')
+
+                            q = _quality(curr=content_curr, prev=content_prev, next=content_fol)
+                            weight = np.exp((-1) * ALPHA * (pos + 1))
+
+                            qjs.append(q)
+                            ws.append(weight)
+                        # Clip qjs
+                        qjs = np.clip(qjs, -1.0, 1.0)
+
+                    # print len(following)
+                    # print "Qualities surrounding my revision"
+                    # print qjs
+                    if len(qjs):
+                        qval = np.average(qjs, weights=ws)
+                    else:
+                        qval = 2.0
+                    feature_dict['quality'] = qval
+
+                    print("===== DICT printing====")
+                    pprint(feature_dict)
+                    print("===== DICT printed====")
+
+                    db.revisions_extended.update_or_insert(db.revisions_extended.revid == curr.get('revid'),
+                                                           **feature_dict)
+                    db.commit()
+
+                if completed:
+                    updates_user = db(db.authors.username == username).update(completed=True)
+                else:
+                    updates_user = db(db.authors.username == username).update(cleaned=False)
+
+                db.commit()
+
+            except:
+                continue
+
+        return locals()
+
+    def load_fresh_from_db(self, store=True, limit_users=50):
         """
         This function should only be used if users and revisions
         already exist in the database. Without that step, it would mostly create empty structures.
@@ -183,7 +439,7 @@ class DataAccess:
         :param limit_users: None or int to control no. of users to be used. Default is None which means all users
         :return: Return two dicts training and test
         """
-    
+
         NUMBER_OF_FEATURES = 14
         LIMITER = -1
 
@@ -191,17 +447,17 @@ class DataAccess:
 
         # Get users from the DB where revisions are available
         users = self.db(db.authors.completed == True).select()
-    
+
         # Initialize empty dicts
         training_dict = {}
         test_dict = {}
 
         # Basic normalization values from full Revisions set
-        print "Getting base normalization values after %r seconds"%(time.clock() - t_start)
+        print "Getting base normalization values after %r seconds" % (time.clock() - t_start)
         main_normalizer_values = _get_main_normalization_values()
 
         # Start getting revisions for each user
-        print "Starting the loop after %r seconds"%(time.clock() - t_start)
+        print "Starting the loop after %r seconds" % (time.clock() - t_start)
         for i in users[:limit_users]:
             revisions = self.db(db.revisions.username == i.username).select()
 
@@ -275,12 +531,12 @@ class DataAccess:
             # Store:
             if store:
                 # Store the entries into json files
-                training_file = os.path.join(os.getcwd(), 'data','trainig_data.json')
-                test_file = os.path.join(os.getcwd(), 'data','test_data.json')
+                training_file = os.path.join(os.getcwd(), 'data', 'trainig_data.json')
+                test_file = os.path.join(os.getcwd(), 'data', 'test_data.json')
                 try:
                     # Try to backup last data
-                    os.rename(training_file, training_file+".bak")
-                    os.rename(test_file,test_file+".bak")
+                    os.rename(training_file, training_file + ".bak")
+                    os.rename(test_file, test_file + ".bak")
                 except:
                     pass
 
@@ -289,7 +545,7 @@ class DataAccess:
 
                 with open(test_file, 'wb') as output:
                     json.dump(data_to_json(test_dict), output)
-    
+
         return training_dict, test_dict
 
 

@@ -132,10 +132,10 @@ if __name__ == "__main__":
     # print postive, negative, ratio
     # print "Neg/All for only last revisoins of each user", ratio_only_last, 2*(ratio_only_last)*(1-ratio_only_last)
     # print "Neg/All for all revisions", ratio, 2*(ratio)*(1-ratio)
-    from training import train_nn_using_k_lstm_bit, test_nn_using_k_lstm_bit, train_nn_only, test_nn_only, test_oracle
+    from learning import train_nn_using_k_lstm_bit, test_nn_using_k_lstm_bit, train_nn_only, test_nn_only, test_oracle
 
     N = 5000
-    k = None
+    k = 1
     test_only = False
     weighted_learning = False
     balanced = True

@@ -14,6 +14,8 @@ storage*
 results/*
 !results/README.md
 libs/
+data/*
+!data/README.md
 
 ## web2py
 progress.log

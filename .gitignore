@@ -13,6 +13,7 @@ storage*
 *.config
 results/*
 !results/README.md
+!results/figs
 results/figs/*
 !results/figs/README.md
 libs/

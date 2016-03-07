@@ -29,9 +29,6 @@ class Serializable(object):
     @staticmethod
     def dumps(obj, pack_ndarray=True, tolerant=True):
         def custom(o):
-            if isinstance(o,tuple):
-                d = {'meta_class': 'tuple',
-                     'tuple': list(o)}
             if isinstance(o, Serializable):
                 module = o.__class__.__module__.split('campil.')[-1]
                 d = {'meta_class': '%s.%s' % (module,
@@ -42,7 +39,7 @@ class Serializable(object):
                 d = {'meta_class': 'datetime.datetime',
                      'date': o.isoformat()}
                 return d
-            elif isinstance(o,tuple):
+            elif isinstance(o, (tuple, list)):
                 d = {'meta_class': 'tuple',
                      'tuple': list(o)}
                 return d
@@ -58,14 +55,14 @@ class Serializable(object):
                 d = {'meta_class': 'numpy.ndarray',
                      'dtype': str(o.dtype),
                      'shape': o.shape,
-                     'data': base64.b64encode(o.tostring())}
+                     'results': base64.b64encode(o.tostring())}
                 return d
 
             # We try to preserve numpy numbers.
             elif type(o).__module__ == numpy.__name__ and isinstance(o, numbers.Real):
                 d = {'meta_class': 'numpy.number',
                      'dtype': str(o.dtype),
-                     'data': base64.b64encode(o.tostring())
+                     'results': base64.b64encode(o.tostring())
                      }
                 return d
 
@@ -89,9 +86,6 @@ class Serializable(object):
     def from_json(s, objectify=True, to_camarray=False):
         def hook(o):
             meta_module, meta_class = None, o.get('meta_class')
-            if meta_class == 'tuple':
-                # Tuple.
-                return tuple(o['tuple'])
             if meta_class in ('Datetime', 'datetime.datetime'):
                 # 'Datetime' included for backward compatibility
                 try:
@@ -109,7 +103,7 @@ class Serializable(object):
                 return tuple(o['tuple'])
             # Numpy arrays.
             elif meta_class == 'numpy.ndarray':
-                data = base64.b64decode(o['data'])
+                data = base64.b64decode(o['results'])
                 dtype = o['dtype']
                 shape = o['shape']
                 v = numpy.frombuffer(data, dtype=dtype)
@@ -117,7 +111,7 @@ class Serializable(object):
                 return v
             # Numpy numbers.
             elif meta_class == 'numpy.number':
-                data = base64.b64decode(o['data'])
+                data = base64.b64decode(o['results'])
                 dtype = o['dtype']
                 v = numpy.frombuffer(data, dtype=dtype)[0]
                 return v

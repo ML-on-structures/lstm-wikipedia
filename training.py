@@ -1,3 +1,30 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
+"""
+This file contains the main algorithm process for
+LSTM and Neural Net combinations on Wikipedia Data.
+Functions defined here require results input in the
+specific format. With the training and test results,
+these functions perform the remaining operations as required.
+
+These functions rely on LSTM and DNN classes from
+lstm.py and nn_base.py respectively
+
+Special libraries required: numpy
+Standard libraries used: json, os, pickle, random, time
+
+Primary functions:
+    - train_nn_using_k_lstm_bit
+    - test_nn_using_k_lstm_bit
+    - train_nn_only
+    - test_nn_only
+
+- Rakshit Agrawal, 2016
+"""
+
+
+
 import json
 import os
 import pickle
@@ -43,7 +70,7 @@ def _train_nn_with_k_lstm_bits(data_list,
     )
 
     For a given number N of iterations:
-        For each author now, run the author's data (0-n-1) revisions
+        For each author now, run the author's results (0-n-1) revisions
         through the LSTM. From the LSTM extract k bits of output and
         send them along with nth revision's features to the Neural Net.
         Output from the Neural Net is then compared with our target value
@@ -56,6 +83,8 @@ def _train_nn_with_k_lstm_bits(data_list,
     :param data_list: This list contains all items in structure (author, (x_mat, fy, yt))
     :param k: Number of bits to be used
     :param N: Number of iterations for training
+    :param quality: Boolean to control if working on quality, otherwise existence
+    :param fix_bit_val: Fixed value of bit to be used if only that bit should be passed to NN
     :param weighted_learning: Boolena to control weighted learning. Default is False
     :return: (Trained LSTM, Trained NNet), List of errors
     """
@@ -72,13 +101,16 @@ def _train_nn_with_k_lstm_bits(data_list,
     # NN will take input from it's inputs + k bits.
     # Value of middle layer in NN is set with different experiments (can be changed)
     # NN will give 1 output (for quality of revision)
-    nnet.initialize([k + 12, k + 12 + (M / 2), 1])
+    if k is not None:
+        nnet.initialize([k + 12, k + 12 + (M / 2), 1])
+    else:
+        nnet.initialize([12 + 12, 12 + 12 + (M / 2), 1])
 
     iter_ctr = N
     # Perform the following for N iterations
     for iteration in range(N):
 
-        # Shuffle the positions of data
+        # Shuffle the positions of results
         random.shuffle(data_list)
 
         # Create empty list for collecting errors, predicted outputs
@@ -160,7 +192,7 @@ def _test_nn_with_k_lstm_bits(test_data, lstm, nnet, k=None, quality=True):
 
     Now pass it through trained LSTM and Neural net combination which has been
     For each author,
-        run the author's data (0-n-1) revisions
+        run the author's results (0-n-1) revisions
         through the LSTM. From the LSTM extract k bits of output and
         send them along with nth revision's features to the Neural Net.
         Output from the Neural Net is then compared with our target value
@@ -231,10 +263,10 @@ def _test_nn_with_k_lstm_bits(test_data, lstm, nnet, k=None, quality=True):
 def train_nn_using_k_lstm_bit(train_dict,
                               k=None,
                               N=1000,
-                              fix_bit_val=None,
                               quality = True,
+                              fix_bit_val=None,
                               store=False,
-                              picklefile=os.path.join(os.getcwd(), 'data', 'temp_model.pkl'),
+                              picklefile=os.path.join(os.getcwd(), 'results', 'temp_model.pkl'),
                               weighted_learning=False,
                               balanced=True):
     """
@@ -243,8 +275,13 @@ def train_nn_using_k_lstm_bit(train_dict,
     :param train_dict: dict containing entries of revisions per user
     :param k: Number of bits to be used from LSTM
     :param N: Number of iterations for network to train. Default is 1000
+    :param quality: Boolean to control if working on quality, otherwise existence
+    :param fix_bit_val: Fixed value of bit to be used if only that bit should be passed to NN
     :param store: Boolean to decide whether to store result in pickle
     :param picklefile: Pickle filename
+    :param weighted_learning: Boolean to control whether learning is weighted or not
+    :param balanced: Boolean to control whether results should be balanced before use or not
+    :rtype tuple
     :return: Returns a tuple consisting of lstm and neural net (lstm, nnet)
     """
     train_items = train_dict.items()
@@ -262,8 +299,8 @@ def train_nn_using_k_lstm_bit(train_dict,
     # Store the trained model into a pickle if store is True
     if store:
         file_basic_name = 'trained_lstm_%r_nn_%r_%r' % (k, N, "weighted" if weighted_learning else "unweighted")
-        serialize_file_lstm = os.path.join(os.getcwd(), 'data', file_basic_name + 'lstm.json')
-        serialize_file_nn = os.path.join(os.getcwd(), 'data', file_basic_name + 'nn.json')
+        serialize_file_lstm = os.path.join(os.getcwd(), 'results', file_basic_name + 'lstm.json')
+        serialize_file_nn = os.path.join(os.getcwd(), 'results', file_basic_name + 'nn.json')
         from json_plus import Serializable
         ser_result_lstm = Serializable.dumps(lstm_out)
         ser_result_nn = Serializable.dumps(nn_out)
@@ -283,7 +320,7 @@ def train_nn_using_k_lstm_bit(train_dict,
 def _expand_to_all(items):
     """
     For NN only case, instead of using only last edit for training,
-    use each and every edit by every user. Using full data basically
+    use each and every edit by every user. Using full results basically
     :param train_items:
     :return:
     """
@@ -301,7 +338,7 @@ def _expand_to_all(items):
 
 def _rebalance_data(items):
     """
-    Rebalance the biased data to a balanced set where probability
+    Rebalance the biased results to a balanced set where probability
     of each label is 0.5
 
     While using all negative results, add randomly selected equal
@@ -312,13 +349,17 @@ def _rebalance_data(items):
     """
     neg_items = [(author, (x_mat, fy, yt)) for (author, (x_mat, fy, yt)) in items if yt<0.5]
     pos_items = [(author, (x_mat, fy, yt)) for (author, (x_mat, fy, yt)) in items if yt>0.5]
-    pos_items = random.sample(pos_items, len(neg_items))
+
+    if len(neg_items)<=len(pos_items):
+        pos_items = random.sample(pos_items, len(neg_items))
+    else:
+        neg_items = random.sample(neg_items, len(pos_items))
 
     new_items = neg_items+pos_items
     print len(neg_items)
     print len(new_items)
 
-    # Shuffle 5 times to ensure mix of data
+    # Shuffle 5 times to ensure mix of results
     for i in range(5):
         np.random.shuffle(new_items)
     return new_items
@@ -327,7 +368,7 @@ def _rebalance_data(items):
 def train_nn_only(train_dict,
                   N=1000,
                   store=False,
-                  picklefile=os.path.join(os.getcwd(), 'data', 'temp_model.pkl'),
+                  picklefile=os.path.join(os.getcwd(), 'results', 'temp_model.pkl'),
                   weighted_learning=False):
     """
     Train the LSTM and NNet combination using training dict.
@@ -355,8 +396,8 @@ def train_nn_only(train_dict,
     # Store the trained model into a pickle if store is True
     if store:
         # file_basic_name = 'trained_nn_only_%r_' % (N)
-        # serialize_file_lstm = os.path.join(os.getcwd(), 'data', file_basic_name + 'lstm.json')
-        # serialize_file_nn = os.path.join(os.getcwd(), 'data', file_basic_name + 'nn.json')
+        # serialize_file_lstm = os.path.join(os.getcwd(), 'results', file_basic_name + 'lstm.json')
+        # serialize_file_nn = os.path.join(os.getcwd(), 'results', file_basic_name + 'nn.json')
         # from json_plus import Serializable
         # ser_result_lstm = Serializable.dumps(lstm_out)
         # ser_result_nn = Serializable.dumps(nn_out)
@@ -410,8 +451,8 @@ def test_nn_using_k_lstm_bit(test_dict, lstm, nnet, k=None, quality=True):
     :param test_dict:
     :return:
     """
-    # serialize_file_lstm = os.path.join(os.getcwd(), 'data','ser_file_lstm.json')
-    # serialize_file_nn = os.path.join(os.getcwd(), 'data','ser_file_nn.json')
+    # serialize_file_lstm = os.path.join(os.getcwd(), 'results','ser_file_lstm.json')
+    # serialize_file_nn = os.path.join(os.getcwd(), 'results','ser_file_nn.json')
     # from json_plus import Serializable
     #
     # with open(serialize_file_lstm, 'rb') as input:
@@ -419,7 +460,7 @@ def test_nn_using_k_lstm_bit(test_dict, lstm, nnet, k=None, quality=True):
     # with open(serialize_file_nn, 'rb') as input:
     #     nnet = Serializable.loads(json.load(input))
 
-    # Send test data with trained model for testing
+    # Send test results with trained model for testing
     errors, y_pred, y_true, label_weights = _test_nn_with_k_lstm_bits(test_dict, lstm, nnet, k=k, quality=quality)
 
     precision, recall, f_score = _error_measurement(y_pred, y_true, label_weights)
@@ -440,8 +481,8 @@ def test_nn_only(test_dict, lstm, nnet):
     :param test_dict:
     :return:
     """
-    # serialize_file_lstm = os.path.join(os.getcwd(), 'data','ser_file_lstm.json')
-    # serialize_file_nn = os.path.join(os.getcwd(), 'data','ser_file_nn.json')
+    # serialize_file_lstm = os.path.join(os.getcwd(), 'results','ser_file_lstm.json')
+    # serialize_file_nn = os.path.join(os.getcwd(), 'results','ser_file_nn.json')
     # from json_plus import Serializable
     #
     # with open(serialize_file_lstm, 'rb') as input:
@@ -449,7 +490,7 @@ def test_nn_only(test_dict, lstm, nnet):
     # with open(serialize_file_nn, 'rb') as input:
     #     nnet = Serializable.loads(json.load(input))
 
-    # Send test data with trained model for testing
+    # Send test results with trained model for testing
     errors, y_pred, y_true, label_weights = _test_nn_with_k_lstm_bits(test_dict, lstm, nnet, k=0)
 
     precision, recall, f_score = _error_measurement(y_pred, y_true, label_weights)
@@ -469,8 +510,8 @@ def test_oracle(test_dict):
     :param test_dict:
     :return:
     """
-    # serialize_file_lstm = os.path.join(os.getcwd(), 'data','ser_file_lstm.json')
-    # serialize_file_nn = os.path.join(os.getcwd(), 'data','ser_file_nn.json')
+    # serialize_file_lstm = os.path.join(os.getcwd(), 'results','ser_file_lstm.json')
+    # serialize_file_nn = os.path.join(os.getcwd(), 'results','ser_file_nn.json')
     # from json_plus import Serializable
     #
     # with open(serialize_file_lstm, 'rb') as input:
@@ -478,7 +519,7 @@ def test_oracle(test_dict):
     # with open(serialize_file_nn, 'rb') as input:
     #     nnet = Serializable.loads(json.load(input))
 
-    # Send test data with trained model for testing
+    # Send test results with trained model for testing
     y_true = [0 if int(yt)<0 else 1 for (author, (x_mat, fy, yt)) in test_dict.items()]
     y_pred = [random.choice([0,1]) for i in range(len(y_true))]
     label_weights = [1.0 for i in range(len(y_true))]

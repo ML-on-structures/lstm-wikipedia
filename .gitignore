@@ -11,8 +11,8 @@
 storage*
 *.db
 *.config
-data/*
-!data/README.md
+results/*
+!results/README.md
 libs/
 
 ## web2py

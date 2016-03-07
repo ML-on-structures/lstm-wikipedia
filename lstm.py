@@ -197,7 +197,7 @@ class LSTM(Serializable):
         - If d has dimension 3, then it is assumed that it comes already in the
           correct format.
         - If d has dimension 2, then it is assumed that there are batches, and
-          that the data includes only the latest temporal step.  The previous
+          that the results includes only the latest temporal step.  The previous
           temporal steps are filled in with zeros, as appropriate.
         - If d has dimension 1, then it is assumed that no batches are present,
           and that d refers only to the last temporal step.

@@ -39,7 +39,7 @@ def _return_bit_values(test_data, lstm, nnet, k=None, quality=True):
 
     Now pass it through trained LSTM and Neural net combination which has been
     For each author,
-        run the author's data (0-n-1) revisions
+        run the author's results (0-n-1) revisions
         through the LSTM. From the LSTM extract k bits of output and
         send them along with nth revision's features to the Neural Net.
         Output from the Neural Net is then compared with our target value
@@ -168,7 +168,7 @@ def meaning_of_bits(data, lstm, nn, k):
             plt.plot(x, bits, label="Bit %r" % (k))
             plt.plot(x, v, label=FEATURES[str(i)])
             plt.legend(bbox_to_anchor=(0., 1.02, 1., .102), loc=3, ncol=2, mode="expand", borderaxespad=0.)
-            plt.savefig(os.path.join(os.getcwd(), 'data', 'figs', 'bit_' + str(k) + '_feat_' + str(i) + '.png'))
+            plt.savefig(os.path.join(os.getcwd(), 'results', 'figs', 'bit_' + str(k) + '_feat_' + str(i) + '.png'))
             plt.close()
             s = stats.ttest_ind(bits, v)
             print "\nT-test values for bit %r and feature %r: %r" % (k, i, s)
@@ -189,10 +189,10 @@ if __name__ == "__main__":
     test_only = False
     weighted_learning = True
 
-    picklefile = os.path.join(os.getcwd(), 'data',
+    picklefile = os.path.join(os.getcwd(), 'results',
                               'trained_lstm_k%r_%r_%r.pkl' % (k, "weighted" if weighted_learning else "unweighted", N))
 
-    known_pickle = os.path.join(os.getcwd(), 'data', 'nnet_pickle_5000.pkl')
+    known_pickle = os.path.join(os.getcwd(), 'results', 'nnet_pickle_5000.pkl')
 
     with open(picklefile, 'rb') as input:
         (lstm, nn) = pickle.load(input)

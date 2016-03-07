@@ -52,7 +52,7 @@ class Network(object):
         ``(x, y)`` representing the training inputs and the desired
         outputs.  The other non-optional parameters are
         self-explanatory.  If ``test_data`` is provided then the
-        network will be evaluated against the test data after each
+        network will be evaluated against the test results after each
         epoch, and partial progress printed out.  This is useful for
         tracking progress, but slows things down substantially."""
         if test_data: n_test = len(test_data)

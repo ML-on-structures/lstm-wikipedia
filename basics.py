@@ -3,29 +3,33 @@ import json
 import numpy as np
 import pickle
 
+from testing import _load_fresh_from_db
 from serializer import json_to_data
-
 
 def load_data(files=False):
     """
-    Get data from DB if not available in files.
-    Otherwise use files to load data into dict objects
+    Get results from DB if not available in files.
+    Otherwise use files to load results into dict objects
 
     :param files:
     :return:
     """
-    print "Loading data"
+    print "Loading results"
 
-    trn_file = os.path.join(os.getcwd(), 'data', 'training_data.json')
-    tst_file = os.path.join(os.getcwd(), 'data', 'test_data.json')
+    trn_file = os.path.join(os.getcwd(), 'results', 'training_data.json')
+    tst_file = os.path.join(os.getcwd(), 'results', 'test_data.json')
     try:
         f = open(trn_file, 'r')
         vf = open(tst_file, 'r')
     except:
-        print"Need to generate data from DB"
+        print"Need to generate results from DB"
+
+        training, test = _load_fresh_from_db()
+
+
         return None
 
-    # Read data and send to processing
+    # Read results and send to processing
     training = json_to_data(json.load(open(trn_file, 'r')))
     test = json_to_data(json.load(open(tst_file, 'r')))
     print "Data loaded: %r Training elements, and %r Test elements" % (len(training.items()), len(test.items()))
@@ -34,7 +38,7 @@ def load_data(files=False):
 
 def create_user_last_revision_existence_data(data_dict):
     """
-    From training and test data sets, prepare a new dataset
+    From training and test results sets, prepare a new dataset
     with labels for predicitng existence of next revisions of an author.
 
     The logic used here goes like this:
@@ -131,17 +135,17 @@ if __name__ == "__main__":
     from training import train_nn_using_k_lstm_bit, test_nn_using_k_lstm_bit, train_nn_only, test_nn_only, test_oracle
 
     N = 5000
-    k = 12
+    k = None
     test_only = False
     weighted_learning = False
-    balanced = False
+    balanced = True
 
     if objective == "quality":
-        picklefile = os.path.join(os.getcwd(), 'data',
+        picklefile = os.path.join(os.getcwd(), 'results',
                                   'trained_lstm_k%r_%r_%r_%r.pkl' % (
                                       k, "weighted" if weighted_learning else "unweighted",
                                       "balance" if balanced else "unbalanced", N))
-        nn_pickle = os.path.join(os.getcwd(), 'data',
+        nn_pickle = os.path.join(os.getcwd(), 'results',
                                  'trained_nn_only_%r.pkl' % (N))
 
         if test_only:
@@ -152,22 +156,22 @@ if __name__ == "__main__":
                 (lstm, nn) = pickle.load(input)
             test_result = test_nn_only(test, lstm, nn)
         else:
-            # (lstm, nn) = train_nn_using_k_lstm_bit(training, k=k, store=True, N=N, picklefile=picklefile,
-            #                                        weighted_learning=weighted_learning, balanced=balanced)
-            # test_result = test_nn_using_k_lstm_bit(test, lstm, nn, k=k)
+            (lstm, nn) = train_nn_using_k_lstm_bit(training, k=k, store=True, N=N, picklefile=picklefile,
+                                                   weighted_learning=weighted_learning, balanced=balanced)
+            test_result = test_nn_using_k_lstm_bit(test, lstm, nn, k=k)
 
-            (lstm, nn) = train_nn_only(training, store=True, N=N, picklefile=nn_pickle,
-                                        weighted_learning=weighted_learning)
-            test_result = test_nn_only(test, lstm, nn)
+            # (lstm, nn) = train_nn_only(training, store=True, N=N, picklefile=nn_pickle,
+            #                             weighted_learning=weighted_learning)
+            # test_result = test_nn_only(test, lstm, nn)
 
-            print "Oracle Round"
-            oracle_result = test_oracle(test)
+            # print "Oracle Round"
+            # oracle_result = test_oracle(test)
 
     elif objective == "existence":
-        picklefile = os.path.join(os.getcwd(), 'data',
+        picklefile = os.path.join(os.getcwd(), 'results',
                                   'existence_trained_lstm_%r_%r.pkl' % (
                                       "weighted" if weighted_learning else "unweighted", N))
-        nn_pickle = os.path.join(os.getcwd(), 'data',
+        nn_pickle = os.path.join(os.getcwd(), 'results',
                                  'existence_trained_nn_only_%r.pkl' % (N))
         training_new = create_user_last_revision_existence_data(training)
         test_new = create_user_last_revision_existence_data(test)

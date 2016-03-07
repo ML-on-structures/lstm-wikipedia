@@ -34,7 +34,7 @@ def serialize(data):
         return {"py/numpy.ndarray": {
             "values": data.tolist(),
             "dtype":  str(data.dtype)}}
-    raise TypeError("Type %s not data-serializable" % type(data))
+    raise TypeError("Type %s not results-serializable" % type(data))
 
 def restore(dct):
     if "py/dict" in dct:

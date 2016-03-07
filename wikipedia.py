@@ -120,8 +120,8 @@ class WikiFetch:
     """
     Function structure:
 
-        fetch_* function performs data fetch for the concerned operation.
-        parse_* function reads through the data and then calls for additional operations.
+        fetch_* function performs results fetch for the concerned operation.
+        parse_* function reads through the results and then calls for additional operations.
 
     """
 
@@ -184,7 +184,7 @@ class WikiFetch:
                                  include=None,
                                  direction=None):
         """
-        This function connects to Wikipedia and extracts all data for revisions
+        This function connects to Wikipedia and extracts all results for revisions
         of page with pageid.
         Optional parameters of chunk size and continuous are used to set the number of
         revisions to fetch.
@@ -277,7 +277,7 @@ class WikiFetch:
         """
         This function connects to Wikipedia and fetches edits done by a user
         on Wikipedia.
-        The results of this function can then be used to retrieve corresponding revision data.
+        The results of this function can then be used to retrieve corresponding revision results.
         :param username:
         :param start_time:
         :param end_time:

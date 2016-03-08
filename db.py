@@ -8,6 +8,9 @@ import time
 
 from datetime import datetime
 from pydal import DAL, Field
+
+import chdiff
+from editdist import edit_distance
 from serializer import json_to_data, data_to_json
 from wikipedia import WikiFetch
 
@@ -133,7 +136,6 @@ def _normalize_inputs(features, gen_values, last_two=False):
     return np.array(norm_list)
 
 
-
 def _operate_on_contributions(c, username):
     """
     Operate on the contributions sent for a user.
@@ -161,6 +163,192 @@ def _operate_on_contributions(c, username):
     return user_revision, prev_revision, next_revisions
 
 
+def _get_distances(r1, r2, distance_only=False):
+    """
+    Get distance between two revisions r1 and r2.
+    Uses chdiff.py and editdist.py
+
+    :param r1:
+    :param r2:
+    :param distance_only:
+    :return:
+    """
+    results = {}  # Dict for results
+
+    l1 = r1.split()  # tokenize first revision
+    l2 = r2.split()  # tokenize second revision
+
+    # Compute distance using chdiff
+    x, w, y, added_words = chdiff.fast_compute_edit_list(l1, l2)
+    minlen = min(len(l1), len(l2))
+
+    # Get list of distances from chdiff
+    # The head and tail of list have to be attached to the main w
+    a = ([x] if x is not None else []) + w + ([y] if y is not None else [])
+    distance = edit_distance(a, minlen)
+
+    # Return the distance if only distance is needed.
+    if distance_only:
+        return distance
+
+    # Get addition and deletion lists
+    addition_list = [i[3] for i in a if i[0] == chdiff.INSERT]
+    deletion_list = [i[3] for i in a if i[0] == chdiff.DELETE]
+
+    # Position list for any action on page
+    action_position_list = [i[1] for i in a]
+
+    # Separate addition and deletion position lists
+    # ---Currently not being used
+    # add_position_list = [i[2] for i in a if i[0] == chdiff.INSERT]
+    # del_position_list = [i[1] for i in a if i[0] == chdiff.DELETE]
+
+    # Set char added and char removed in the result dict
+    results['chars_added'] = sum(addition_list)
+    results['chars_removed'] = sum(deletion_list)
+
+    # Measure spread in the page
+    # Spread is std dev of locations normalized by size of page
+    results['spread'] = np.std(action_position_list) / (1.0 * len(l1))
+
+    # Measure position in the page
+    # Position in page is weighted average of all change locations
+    results['position_in_page'] = np.clip(np.average(action_position_list, weights=[i[3] for i in a]) / (1.0 * len(l1)),
+                                          0.0,
+                                          1.0)
+
+    # Generate added text from the changes
+    # Added text
+    added_text = ""
+    for word in added_words:
+        for t in word:
+            added_text = added_text + unicode(t) + " "
+        added_text += "; "
+    # Words added in the revision are stored as a long string of
+    # each word chunk separated by semicolon
+    results['revision_added_text'] = added_text[:5000]
+
+    # Measure ratios for added text data
+
+    # Create auxilary lists to be used in ratio calculation
+    uc = sum([sum([1 for i in x if unicode(i).isupper()]) for x in added_text])
+    lc = sum([sum([1 for i in x if unicode(i).islower()]) for x in added_text])
+    digit = sum([sum([1 for i in x if unicode(i).isdigit()]) for x in added_text])
+
+    # Uppercase/ Lowercase Ratio
+    results['upper_lower_ratio'] = (1.0 * uc) / (1.0 * lc) if lc else 1.0
+
+    # Digit/ Total Ratio
+    results['digit_total_ratio'] = (1.0 * digit) / (1.0 * len(added_text)) if len(added_text) else 0.0
+
+    # Return the dict holding these character features
+    return results
+
+
+def _get_previous_by_user_on_page(username, page, revision):
+    """
+    Get the previous revision by user with username
+    on the given page. Using the revision provided.
+
+    :param username: Username of user
+    :param page: Page to which revision belongs (pageid)
+    :param revision: Revision being used currently (revid)
+    :return:
+    """
+    if revision is None:
+        return 0
+
+    w = WikiFetch()
+    prev_revision = w.fetch_revisions_for_page(pageid=page,
+                                               start_rev=revision,
+                                               chunk_size=2,
+                                               direction="older",
+                                               include=username)
+    if len(prev_revision) < 2:
+        return 0
+
+    t_val = datetime.strptime(prev_revision[1].get('timestamp'), DATE_PATTERN)
+
+    return t_val
+
+
+def _measure_revision_quality(curr, prev, foll, next_count):
+    """
+    Measure the quality of Current revision c,  using Previous revision p
+    and upto next n revisions denoted as k_j:j \in {1...n)
+    and upto next_count of the foll revisions
+
+    Quality is calculated by first getting distance of c with p, calling it pc.
+    Then for each k_j:
+        Get the distance of k_j from c and p.
+
+        So now we have three distances pc, pk_j and ck_j.
+
+        Quality of c based on k_j is calculated as the
+        difference between distance pk_j and ck_j
+        divided by distnace pc
+        Means,
+        difference of how much change exists between k_j and previous,
+        and between k_j and current. This difference is a representative
+        of what was retained from c till k_j
+        Dividing this by the distance of current from previous basically
+        divides the retention by the amount of change actually performed.
+        This value should be between -1 and 1 where
+        -1 means that all of the change was reverted back and
+        +1 means that all of the change was retained
+
+    Final quality is a weighted average of quality with respect to n next revisions
+    weighted by their sequence distance from current (eg. 1, 2, ...n)
+
+    :param curr: Current revision object (A list with a single dict object)
+    :param prev: Previous revision object (A list with a single dict object)
+    :param foll: 10 next revisions (A list with a multiple dict objects)
+    :param next_count: Number of revisions to use from foll list
+    :return: Measured quality (float)
+    """
+    # Initializing empty lists for Q_j's and weights
+    qjs = []  # Quality measure from jth following revision
+    wjs = []  # weight assigned to jth revision's quality
+
+    # Get content of current and previous revisions
+    content_curr = curr[0].get('*', '')
+    content_prev = prev[0].get('*', '')
+
+    # Measure with each next revision
+    if len(foll):
+        for pos, v in enumerate(foll[:next_count]):
+
+            # Get content of this following revision
+            content_foll = v.get('*', '')
+
+            # Measure three distances
+            # Distance of current from previous
+            dist_pc = _get_distances(content_curr, content_prev, distance_only=True)
+            # Distance of following from current
+            dist_cf = _get_distances(content_curr, content_foll, distance_only=True)
+            # Distance of following from previous
+            dist_pf = _get_distances(content_prev, content_foll, distance_only=True)
+
+            # Now calculate the q_j for this following revision
+            q_j = 1.0 * ((dist_pf - dist_cf) / (1.0 * dist_pc)) if dist_pc else 0.0
+
+            # Provide a weight to this quality which is a function of
+            # the revision's sequence distnace from current revision
+            w_j = np.exp((-1) * ALPHA * (pos + 1))
+
+            # Add q_j and weight to a list for averaging later
+            qjs.append(q_j)
+            wjs.append(w_j)
+
+        # Clip all qjs to stay within [-1,1] range
+        qjs = np.clip(qjs, -1.0, 1.0)
+
+    # Get quality as weighted average of all if they exist.
+    # Otherwise return 2.0 to make it an outlier in future prediction usage
+    quality = np.average(qjs, weights=wjs) if len(qjs) else 2.0
+
+    return quality
+
 
 class DataAccess:
     """
@@ -177,7 +365,8 @@ class DataAccess:
                                             Field('contributions', 'integer'),
                                             Field('user_since', 'datetime'),
                                             Field('cleaned', 'boolean', default=False),
-                                            Field('completed', 'boolean', default=False), migrate=False)
+                                            Field('completed', 'boolean', default=False),
+                                            migrate=False)
 
         self.revisions = self.db.define_table('revisions_extended',
                                               Field('revid', 'integer', unique=True),
@@ -242,12 +431,14 @@ class DataAccess:
         To identify an author with revisions collected, the boolean value 'completed' in table 'authors'
         is set to True if the user's edits are stored.
 
-        :return:
+        :return: Returns total count of revisions fetched
         """
 
         # Object for WikiFetch class (to communicate with Wikipedia)
         w = WikiFetch()
 
+        # Rveision count for total sum
+        total_rev_count = 0
         # Get users from the table. Controlled by 'cleaned' and 'completed'
         q = (
                 db.authors.user_since > START_TIME) & (
@@ -264,6 +455,11 @@ class DataAccess:
             # it is very long running and sometimes due to unknown
             # errors it tends to consider some DB fields with Nan
             # values even when the code works totally fine.
+            #
+            # There are places where due to certain errors in values
+            # we stop considering a particular user and move on to next.
+            # Since we have a really large number of users, we can avoid
+            # such issues by not using the users.
             try:
                 # Basic user values available in 'authors' table
                 username = i['username']
@@ -308,52 +504,68 @@ class DataAccess:
                         completed = False
                         break
 
-                    # Basic features of current revision
-                    # To be ussed in collecting features
+                    # Get individual entry from list curr
                     curr = curr[0]
+
+                    # Basic features of current revision
                     t_curr = datetime.strptime(curr.get('timestamp'), DATE_PATTERN)
                     content_curr = curr.get('*', '')
                     parent_curr = curr.get('parentid', None)
 
+                    # Get parent revision of current using parentID
+                    # Features of parent revision are required in order to
+                    # measure distance and char update values of this revision
                     parent_rev = w.fetch_revisions_for_page(pageid=pageid,
                                                             start_rev=parent_curr,
                                                             chunk_size=1, )
+                    # Do not use the revision if parent_rev can't be fetched.
                     if not parent_rev:
                         completed = False
                         break
-                    # print parent_rev
+
+                    # Basic features of parent revision
                     parent_rev = parent_rev[0]
                     content_parent = parent_rev.get('*', '')
                     t_prev_page = datetime.strptime(parent_rev.get('timestamp'), DATE_PATTERN)
 
+                    # Get next revision on page for future time feature
+                    # The call will include current revision also
                     next_rev = w.fetch_revisions_for_page(pageid=pageid,
                                                           start_rev=curr['revid'],
                                                           chunk_size=2,
                                                           direction="newer", )
+
+                    # Check if next revision was retrieved or not
+                    # If not then do not continue with this
                     if len(next_rev) < 2:
                         completed = False
                         break
 
+                    # To get time feature from next revision on this page
                     next_rev = next_rev[1]
                     t_next_page = datetime.strptime(next_rev.get('timestamp'), DATE_PATTERN)
 
                     # Get distances from parent revision
+                    # Here we get character features by comparing current revision with parent revision
                     feature_dict = _get_distances(content_curr, content_parent)
+
+                    # Now add action features to this set of character features
                     feature_dict['rev_comment_length'] = len(curr.get('comment', ''))
                     feature_dict['time_in_day'] = t_curr.hour
                     feature_dict['day_of_week'] = t_curr.weekday()
 
-                    # Time delta values
+                    # Getting time features now by using current, previous and next tinmes.
 
-                    # Previous on page
+                    # Time from previous revision on page
                     feature_dict['time_prev_page'] = (t_curr - t_prev_page).total_seconds() / (
                         1.0 * SECS_IN_HR * HRS_IN_WEEK)
 
-                    # Next on page
+                    # Time to next on page
                     feature_dict['time_next_page'] = (t_next_page - t_curr).total_seconds() / (
                         1.0 * SECS_IN_HR * HRS_IN_WEEK)
 
-                    # Previous by user
+                    # Time from previous revision by user
+                    # The call will include current revision also
                     contribution_before = w.get_user_contributions(username=username,
                                                                    cont_limit=2,
                                                                    start_time=curr.get('timestamp'),
@@ -365,7 +577,7 @@ class DataAccess:
                     feature_dict['time_prev_user'] = (t_curr - t_user_prev).total_seconds() / (
                         1.0 * SECS_IN_HR * HRS_IN_WEEK) if t_user_prev else 0.0
 
-                    # Previous by user on page
+                    # Time from previous revision by user on this page
                     t_user_page_prev = _get_previous_by_user_on_page(username=username,
                                                                      page=pageid,
                                                                      revision=curr.get('revid', None))
@@ -373,59 +585,53 @@ class DataAccess:
                     feature_dict['time_prev_user_page'] = (t_curr - t_user_page_prev).total_seconds() / (
                         1.0 * SECS_IN_HR * HRS_IN_WEEK) if t_user_page_prev else 0.0
 
+                    # Fill in remaining entries of revision dict
+                    # to be placed in the DB. These include values from
+                    # result dict obtained by calling Wikimedia API
                     feature_dict['revid'] = curr.get('revid')
                     feature_dict['pageid'] = pageid
                     feature_dict['username'] = username
-                    feature_dict['rev_timestamp'] = t_curr
+                    feature_dict['rev_timestamp'] = t_curr  # To get it as datetime type
                     feature_dict['userid'] = curr['userid']
                     feature_dict['rev_content'] = content_curr
                     feature_dict['rev_comment'] = curr.get('comment', '')
                     feature_dict['rev_size'] = curr['size']
 
+                    # Now we need to calculate the quality of this revision by
+                    # using a revision prior to it from a different author and
+                    # using next 10 revisions by different authors
                     # Measure quality for current revision
-                    content_prev = prev[0].get('*', '')
-                    qjs = []
-                    ws = []
-                    if len(following):
-                        for pos, v in enumerate(following):
-                            content_fol = v.get('*', '')
+                    quality = _measure_revision_quality(curr=curr, prev=prev, foll=following, next_count=10)
+                    feature_dict['quality'] = quality
 
-                            q = _quality(curr=content_curr, prev=content_prev, next=content_fol)
-                            weight = np.exp((-1) * ALPHA * (pos + 1))
+                    # Can print and look at the dict if needed
+                    # print("===== DICT printing====")
+                    # pprint(feature_dict)
+                    # print("===== DICT printed====")
 
-                            qjs.append(q)
-                            ws.append(weight)
-                        # Clip qjs
-                        qjs = np.clip(qjs, -1.0, 1.0)
-
-                    # print len(following)
-                    # print "Qualities surrounding my revision"
-                    # print qjs
-                    if len(qjs):
-                        qval = np.average(qjs, weights=ws)
-                    else:
-                        qval = 2.0
-                    feature_dict['quality'] = qval
-
-                    print("===== DICT printing====")
-                    pprint(feature_dict)
-                    print("===== DICT printed====")
-
-                    db.revisions_extended.update_or_insert(db.revisions_extended.revid == curr.get('revid'),
+                    # Push revision into the DB
+                    self.db.revisions.update_or_insert(db.revisions.revid == curr.get('revid'),
                                                            **feature_dict)
-                    db.commit()
+                    # Commit at this point to ensure it stays in DB even if something else crashes
+                    self.db.commit()
 
+                    # Update total revision count
+                    total_rev_count+=1
+
+                # Use completed boolean to update authors table flags
                 if completed:
-                    updates_user = db(db.authors.username == username).update(completed=True)
+                    updates_user = self.db(db.authors.username == username).update(completed=True)
                 else:
-                    updates_user = db(db.authors.username == username).update(cleaned=False)
+                    updates_user = self.db(db.authors.username == username).update(cleaned=False)
 
-                db.commit()
+                self.db.commit()
 
             except:
+                # Basically if the revision fetch process crashed for any unknown reason,
+                # just continue the loop and move to next user.
                 continue
 
-        return locals()
+        return total_rev_count
 
     def load_fresh_from_db(self, store=True, limit_users=50):
         """

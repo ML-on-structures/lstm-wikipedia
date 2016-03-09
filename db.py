@@ -317,7 +317,6 @@ def _measure_revision_quality(curr, prev, foll, next_count):
     # Measure with each next revision
     if len(foll):
         for pos, v in enumerate(foll[:next_count]):
-
             # Get content of this following revision
             content_foll = v.get('*', '')
 
@@ -611,12 +610,12 @@ class DataAccess:
 
                     # Push revision into the DB
                     self.db.revisions.update_or_insert(db.revisions.revid == curr.get('revid'),
-                                                           **feature_dict)
+                                                       **feature_dict)
                     # Commit at this point to ensure it stays in DB even if something else crashes
                     self.db.commit()
 
                     # Update total revision count
-                    total_rev_count+=1
+                    total_rev_count += 1
 
                 # Use completed boolean to update authors table flags
                 if completed:

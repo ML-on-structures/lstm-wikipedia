@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-# This controller works on communication with Wikipedia.
+# This module works on communication with Wikipedia.
 # All communication of the system to Wikipedia API
 # is defined in this file.
 #
@@ -25,65 +25,65 @@ WIKI_MAX_REVISION_LIMIT = 500  # Update if any change observed. Not used mostly 
 
 WIKI_PARAMS = {
     'revisions': {  # Parameters to fetch revisions for given pageids
-                    "action": "query",
-                    "prop": "revisions",
-                    "format": "json",
-                    "rvprop": "ids|timestamp|user|userid|size|comment|content|tags",  # |parsetree",
-                    #"rvlimit": "10",
-                    #"pageids": "",
-                    #"rvdir": "newer",
-                    # "rvexcludeuser":""  # Not to be used directly here. Only to be added conditionally
-                    },
+        "action": "query",
+        "prop": "revisions",
+        "format": "json",
+        "rvprop": "ids|timestamp|user|userid|size|comment|content|tags",  # |parsetree",
+        # "rvlimit": "10",
+        # "pageids": "",
+        # "rvdir": "newer",
+        # "rvexcludeuser":""  # Not to be used directly here. Only to be added conditionally
+    },
     'recent_changes': {  # Parameters to fetch revisions for pages with recent changes
-                         "action": "query",
-                         "prop": "revisions",
-                         "format": "json",
-                         "rvprop": "ids|timestamp|user|userid",
-                         "indexpageids": "1",
-                         "generator": "recentchanges",
-                         "grcdir": "older",
-                         "grcnamespace": "0",
-                         "grcprop": "ids",
-                         "grcshow": "minor",
-                         "grclimit": "100"
+        "action": "query",
+        "prop": "revisions",
+        "format": "json",
+        "rvprop": "ids|timestamp|user|userid",
+        "indexpageids": "1",
+        "generator": "recentchanges",
+        "grcdir": "older",
+        "grcnamespace": "0",
+        "grcprop": "ids",
+        "grcshow": "minor",
+        "grclimit": "100"
 
-                         },
+    },
     'category_members': {  # Parameters to fetch list of category members for a given category.
-                           "action": "query",
-                           "list": "categorymembers",
-                           "cmpageid": "44126225",
-                           "format": "json",
-                           "cmprop": "ids|title|type",
-                           "cmlimit": "max",
-                           "indexpageids": "1",
-                           "audir": "descending",
-                           },
+        "action": "query",
+        "list": "categorymembers",
+        "cmpageid": "44126225",
+        "format": "json",
+        "cmprop": "ids|title|type",
+        "cmlimit": "max",
+        "indexpageids": "1",
+        "audir": "descending",
+    },
     'page_info': {  # Parameters for Page Information
-                    "action": "query",
-                    "prop": "info",
-                    "format": "json",
-                    "pageids": ""
-                    },
+        "action": "query",
+        "prop": "info",
+        "format": "json",
+        "pageids": ""
+    },
     'user_contributions': {  # Parameters to fetch revisions for given pageids
-                             "action": "query",
-                             "list": "usercontribs",
-                             "format": "json",
-                             "ucprop": "ids|title|timestamp|sizediff|tags|size|comment",
-                             "uclimit": "10",
-                             "ucuser": "",
-                             "ucdir": "newer",
-                             "ucnamespace": "0",
-                             },
+        "action": "query",
+        "list": "usercontribs",
+        "format": "json",
+        "ucprop": "ids|title|timestamp|sizediff|tags|size|comment",
+        "uclimit": "10",
+        "ucuser": "",
+        "ucdir": "newer",
+        "ucnamespace": "0",
+    },
     'allusers': {  # Parameters for User list
-                   # /w/api.php?action=query&list=allusers&format=json&auprefix=R&aulimit=100&auwitheditsonly=
-                   "action": "query",
-                   "list": "allusers",
-                   "format": "json",
-                   "auprefix": "",
-                   "aulimit": "100",
-                   "auprop":"editcount|registration",
-                   "auwitheditsonly": "",
-                   },
+        # /w/api.php?action=query&list=allusers&format=json&auprefix=R&aulimit=100&auwitheditsonly=
+        "action": "query",
+        "list": "allusers",
+        "format": "json",
+        "auprefix": "",
+        "aulimit": "100",
+        "auprop": "editcount|registration",
+        "auwitheditsonly": "",
+    },
 }
 
 
@@ -220,7 +220,7 @@ class WikiFetch:
         elif include:
             wiki_access['rvuser'] = include
 
-       # print wiki_access
+            # print wiki_access
         # GET the revisions from Wikipedia
         result = _get(url=WIKI_BASE_URL, values=wiki_access)
 
@@ -254,8 +254,8 @@ class WikiFetch:
 
                 # Add new revisions by recursively calling this function
                 revisions += WikiFetch().fetch_revisions_for_page(pageid=pageid,
-                                                           start_rev=new_start_rev,
-                                                           continuous=True)
+                                                                  start_rev=new_start_rev,
+                                                                  continuous=True)
 
                 # Else case not required here because revisions are completely
                 # updated at this point if only latest revision has been fetched.
@@ -300,16 +300,15 @@ class WikiFetch:
 
         # GET the user contributions from Wikipedia
         result = _get(url=WIKI_BASE_URL, values=wiki_access)
-        #print result
+        # print result
 
 
         # Extract user contribution list from resulting json
         try:
             contributions = result["query"]["usercontribs"]
-            #print contributions
-            logging.info( "Length of contributions for {} is {}".format(username,len(contributions)))
+            # print contributions
+            logging.info("Length of contributions for {} is {}".format(username, len(contributions)))
         except:
             contributions = []
-
 
         return contributions

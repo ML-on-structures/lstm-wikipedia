@@ -23,8 +23,6 @@ Primary functions:
 - Rakshit Agrawal, 2016
 """
 
-
-
 import json
 import os
 import pickle
@@ -136,7 +134,7 @@ def _train_nn_with_k_lstm_bits(data_list,
             # Sending input to NNet
             y = nnet.forward(nnet_input)
 
-            if (k>0 or k is None) and quality:
+            if (k > 0 or k is None) and quality:
                 # Quality normalized
                 yt = 1.0 * (yt + 1.0) / 2.0
 
@@ -237,7 +235,7 @@ def _test_nn_with_k_lstm_bits(test_data, lstm, nnet, k=None, quality=True):
         # Sending LSTM output bit combined with last revisions features to Nnet
         y = nnet.forward(nnet_input)
 
-        if k>0 or k is None and quality:
+        if k > 0 or k is None and quality:
             # Quality normalized
             yt = 1.0 * (yt + 1.0) / 2.0
 
@@ -263,7 +261,7 @@ def _test_nn_with_k_lstm_bits(test_data, lstm, nnet, k=None, quality=True):
 def train_nn_using_k_lstm_bit(train_dict,
                               k=None,
                               N=1000,
-                              quality = True,
+                              quality=True,
                               fix_bit_val=None,
                               store=False,
                               picklefile=os.path.join(os.getcwd(), 'results', 'temp_model.pkl'),
@@ -290,7 +288,7 @@ def train_nn_using_k_lstm_bit(train_dict,
 
     # Send for training using k as no. of bits to use
     print "\n==Starting training== (Using %r iterations) and k=%r" % (N, k)
-    print "Statuses-- Weighted: %r, Balanced %r"%(weighted_learning, balanced)
+    print "Statuses-- Weighted: %r, Balanced %r" % (weighted_learning, balanced)
     t_start = time.clock()
     (lstm_out, nn_out), errors = _train_nn_with_k_lstm_bits(train_items, k=k, N=N, fix_bit_val=fix_bit_val,
                                                             weighted_learning=weighted_learning, quality=quality)
@@ -347,15 +345,15 @@ def _rebalance_data(items):
     :param train_items:
     :return:
     """
-    neg_items = [(author, (x_mat, fy, yt)) for (author, (x_mat, fy, yt)) in items if yt<0.5]
-    pos_items = [(author, (x_mat, fy, yt)) for (author, (x_mat, fy, yt)) in items if yt>0.5]
+    neg_items = [(author, (x_mat, fy, yt)) for (author, (x_mat, fy, yt)) in items if yt < 0.5]
+    pos_items = [(author, (x_mat, fy, yt)) for (author, (x_mat, fy, yt)) in items if yt > 0.5]
 
-    if len(neg_items)<=len(pos_items):
+    if len(neg_items) <= len(pos_items):
         pos_items = random.sample(pos_items, len(neg_items))
     else:
         neg_items = random.sample(neg_items, len(pos_items))
 
-    new_items = neg_items+pos_items
+    new_items = neg_items + pos_items
     print len(neg_items)
     print len(new_items)
 
@@ -387,7 +385,7 @@ def train_nn_only(train_dict,
 
     # Send for training using k as no. of bits to use
     print "\n==Starting training== (Using %r iterations)" % (N)
-    print "Statuses-- Weighted: %r"%(weighted_learning,)
+    print "Statuses-- Weighted: %r" % (weighted_learning,)
 
     t_start = time.clock()
     (lstm_out, nn_out), errors = _train_nn_with_k_lstm_bits(train_items, k=0, N=N, weighted_learning=weighted_learning)
@@ -430,7 +428,7 @@ def _error_measurement(y_pred, y_true, label_weights):
 
     print Y_pred
     print Y_true
-    from sklearn.metrics import precision_recall_fscore_support, precision_score, recall_score,f1_score, fbeta_score
+    from sklearn.metrics import precision_recall_fscore_support, precision_score, recall_score, f1_score, fbeta_score
     (precision, recall, fscore, support) = precision_recall_fscore_support(np.array(Y_true), np.array(Y_pred))
     # average='binary')
 
@@ -504,10 +502,13 @@ def test_nn_only(test_dict, lstm, nnet):
 
     return locals()
 
-def test_oracle(test_dict):
-    """
 
-    :param test_dict:
+def test_random(test_dict):
+    """
+    Randomly select labels for each entry.
+    Used just to measure the scores when predicting from data at random.
+
+    :param test_dict: Dict holding the elements with their true labels
     :return:
     """
     # serialize_file_lstm = os.path.join(os.getcwd(), 'results','ser_file_lstm.json')
@@ -520,10 +521,10 @@ def test_oracle(test_dict):
     #     nnet = Serializable.loads(json.load(input))
 
     # Send test results with trained model for testing
-    y_true = [0 if int(yt)<0 else 1 for (author, (x_mat, fy, yt)) in test_dict.items()]
-    y_pred = [random.choice([0,1]) for i in range(len(y_true))]
+    y_true = [0 if int(yt) < 0 else 1 for (author, (x_mat, fy, yt)) in test_dict.items()]
+    y_pred = [random.choice([0, 1]) for i in range(len(y_true))]
     label_weights = [1.0 for i in range(len(y_true))]
-    #errors, y_pred, y_true, label_weights = _test_nn_with_k_lstm_bits(test_dict, lstm, nnet, k=0)
+    # errors, y_pred, y_true, label_weights = _test_nn_with_k_lstm_bits(test_dict, lstm, nnet, k=0)
 
     precision, recall, f_score = _error_measurement(y_pred, y_true, label_weights)
 
@@ -539,4 +540,3 @@ def test_oracle(test_dict):
 
 if __name__ == "__main__":
     print "Starting"
-

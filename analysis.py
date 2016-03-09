@@ -185,7 +185,7 @@ if __name__ == "__main__":
     _, test = load_data(files=True)
 
     N = 5000
-    k = 1232
+    k = 14
     test_only = False
     weighted_learning = False
     balanced = False

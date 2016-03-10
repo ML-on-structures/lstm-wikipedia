@@ -408,6 +408,8 @@ class DataAccess:
                                               Field('time_prev_page', 'double'),
                                               Field('time_prev_user_page', 'double'),
                                               Field('time_next_page', 'double'),
+                                              Field('current_rev_length', 'integer'),
+                                              Field('parent_rev_length', 'integer'),
                                               Field('chars_added', 'integer'),
                                               Field('chars_removed', 'integer'),
                                               Field('spread', 'double'),
@@ -577,6 +579,8 @@ class DataAccess:
                     # Get distances from parent revision
                     # Here we get character features by comparing current revision with parent revision
                     feature_dict = _get_distances(content_curr, content_parent)
+                    feature_dict['current_rev_length'] = len(content_curr)
+                    feature_dict['parent_rev_length'] = len(content_parent)
 
                     # Now add action features to this set of character features
                     feature_dict['rev_comment_length'] = len(curr.get('comment', ''))
@@ -630,8 +634,9 @@ class DataAccess:
                     # using a revision prior to it from a different author and
                     # using next 10 revisions by different authors
                     # Measure quality for current revision
-                    quality = _measure_revision_quality(curr=curr, prev=prev, foll=following, next_count=10)
-                    feature_dict['quality'] = quality
+                    feature_dict['q4'] = _measure_revision_quality(curr=curr, prev=prev, foll=following, next_count=4)
+                    feature_dict['q6'] = _measure_revision_quality(curr=curr, prev=prev, foll=following, next_count=6)
+                    feature_dict['q10'] = _measure_revision_quality(curr=curr, prev=prev, foll=following, next_count=10)
 
                     # Can print and look at the dict if needed
                     # print("===== DICT printing====")
@@ -639,7 +644,7 @@ class DataAccess:
                     # print("===== DICT printed====")
 
                     # Push revision into the DB
-                    self.db.revisions.update_or_insert(db.revisions.revid == curr.get('revid'),
+                    self.db.revisions2.update_or_insert(db.revisions.revid == curr.get('revid'),
                                                        **feature_dict)
                     # Commit at this point to ensure it stays in DB even if something else crashes
                     self.db.commit()
@@ -795,9 +800,5 @@ if __name__ == "__main__":
     #     print revs
     #     print "______________________"
 
-    training, test = db.load_fresh_from_db()
-    print len(training)
-    print len(test)
-
-    for i in training:
-        print i
+    # Collect data
+    db.collect_contributions(lim_start=1, lim_end=50)

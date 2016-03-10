@@ -395,7 +395,37 @@ class DataAccess:
                                               migrate=False
                                               )
 
-    def collect_contributions(self):
+        self.revisions2 = self.db.define_table('revisions_2',
+                                              Field('revid', 'integer', unique=True),
+                                              Field('pageid', 'integer'),
+                                              Field('rev_timestamp', 'datetime'),
+                                              Field('rev_comment'),
+                                              Field('username'),
+                                              Field('userid', 'integer'),
+                                              Field('rev_content', 'text'),
+                                              Field('rev_size'),
+                                              Field('time_prev_user', 'double'),
+                                              Field('time_prev_page', 'double'),
+                                              Field('time_prev_user_page', 'double'),
+                                              Field('time_next_page', 'double'),
+                                              Field('chars_added', 'integer'),
+                                              Field('chars_removed', 'integer'),
+                                              Field('spread', 'double'),
+                                              Field('position_in_page', 'double'),
+                                              Field('time_in_day', 'double'),
+                                              Field('day_of_week', 'integer'),
+                                              Field('rev_comment_length', 'integer'),
+                                              Field('upper_lower_ratio', 'double'),
+                                              Field('digit_total_ratio', 'double'),
+                                              Field('revision_added_text', 'text'),
+                                              Field('processed', 'boolean', default=False),
+                                              Field('q4', 'double'),
+                                              Field('q6', 'double'),
+                                              Field('q10', 'double'),
+                                              migrate=False
+                                              )
+
+    def collect_contributions(self, lim_start=1, lim_end=100):
         """
         Get upto 50 first contributions of a user.
         Users are already pre-fetched into the DB.
@@ -445,7 +475,7 @@ class DataAccess:
                 db.authors.cleaned == True) & (
                 db.authors.completed == False
             )
-        users = self.db(q).select(limitby=(851, 1000))
+        users = self.db(q).select(limitby=(lim_start, lim_end))
 
         # Get revisions for each user from Wikipedia
         for i in users:

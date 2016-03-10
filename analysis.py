@@ -21,7 +21,7 @@ FEATURES = {
     '7': "time in day",
     '8': "day of week",
     '9': "length of comment after review",
-    '10': "ration  of uppercase/lowercase",
+    '10': "ratio of uppercase/lowercase",
     '11': "digit/total ratio",
     '12': "time to next revision",
     '13': "quality of revision",
@@ -110,6 +110,76 @@ def _return_bit_values(test_data, lstm, nnet, k=None, quality=True):
     return errors, y_pred, y_true, label_weights, bits_to_use
 
 
+
+def testing_for_bit(test, lstm, nn):
+    """
+
+    :return:
+    """
+
+    train = os.path.join(request.folder,'static','training_data.json')
+    test = os.path.join(request.folder,'static','test_data.json')
+    try:
+        f = open(train,'r')
+        vf = open(test,'r')
+    except:
+        reason="No file found"
+        return (locals())
+
+    print "Creating sample cases from data"
+
+    # Read data and send to processing
+    train_dict = json_to_data(json.load(open(train,'r')))
+    test_dict = json_to_data(json.load(open(test,'r')))
+
+    # Convert data into all rows of features and target
+    items = test_dict.items()
+    data_list = []
+    refined = [(author, (x_mat, fy, yt)) for cnt, (author, (x_mat, fy, yt)) in enumerate(items) if len(x_mat)>10]
+
+    item1 = random.choice(refined)
+    item2 = random.choice(refined)
+
+    # Use NN with LSTMs 1 bit for these
+    # Train it using a large set of revisions.
+    # Store the trained model and then use from validation ones
+    # For validation inputs check the use of 0 and 1 inputs to bit
+
+    # Pass the revision through LSTM forward,
+    # take out only one bit from it,
+    # and then send it through NNet
+
+    print "Using 1 bit"
+    # Get the trained nnet
+    nnet_pickle = os.path.join(request.folder,'static','nnet_pickle_5000.pkl')
+    with open(nnet_pickle, 'rb') as input:
+        netres = pickle.load(input)
+
+    # send to validation
+    dels = []
+    for entry in items:
+        out_reg, err_reg = _check_bitvalues_of_nn([entry], netres[0],netres[1],st=0,k=1)
+        out_0, err_0 = _check_bitvalues_of_nn([entry], netres[0],netres[1],st=0,k=1, bit_value=0)
+        out_1, err_1 = _check_bitvalues_of_nn([entry], netres[0],netres[1],st=0,k=1, bit_value=1)
+
+        # print "Regular--- Output: ", out_reg, ", Error: ", err_reg
+        # print "0 bit  --- Output: ", out_0, ", Error: ", err_0
+        # print "1 bit  --- Output: ", out_1, ", Error: ", err_1
+        print "-------del: ", (out_1-out_0)
+        dels.append(out_1-out_0)
+
+    pos_dels = [i for i in dels if np.sum(i) >0]
+    print np.std(dels)
+    print np.mean(dels)
+    print len(items)
+
+    #print "Using value 0 for the bit"
+    #net_result = _combined_ops_nn_using_k_bits_test([item1], st=0,k=1, bit_val=0)
+    #print "Using value 1 for the bit"
+    #net_result = _combined_ops_nn_using_k_bits_test([item1], st=0,k=1,bit_val=1)
+
+    return locals()
+
 def meaning_of_bits(data, lstm, nn, k):
     """
 
@@ -120,6 +190,7 @@ def meaning_of_bits(data, lstm, nn, k):
     refined = [(author, (x_mat, fy, yt)) for cnt, (author, (x_mat, fy, yt)) in enumerate(items) if len(x_mat) > 10]
 
     selected_item = random.choice(refined)
+    print "Selected author: ", selected_item[0]
 
     # Operate on item1 and break it into multiple values so as to
     # get revision count increating step by step
@@ -159,6 +230,7 @@ def meaning_of_bits(data, lstm, nn, k):
     print "Length of bits", len(bits_used[0])
     print "Length of features", len(features)
 
+    pvalues = []
     x = range(len(bits_used[0]))
     for i, v in enumerate(features):
 
@@ -171,6 +243,7 @@ def meaning_of_bits(data, lstm, nn, k):
             plt.savefig(os.path.join(os.getcwd(), 'results', 'figs', 'bit_' + str(k) + '_feat_' + str(i) + '.png'))
             plt.close()
             s = stats.ttest_ind(bits, v)
+            pvalues.append((k,i, s.pvalue))
             print "\nT-test values for bit %r and feature %r: %r" % (k, i, s)
 
     # print "Using value 0 for the bit"
@@ -185,10 +258,10 @@ if __name__ == "__main__":
     _, test = load_data(files=True)
 
     N = 5000
-    k = 14
+    k = 12
     test_only = False
     weighted_learning = False
-    balanced = False
+    balanced = True
 
     picklefile = os.path.join(os.getcwd(), 'results',
                               'trained_lstm_k%r_%r_%r.pkl' % (k, "weighted" if weighted_learning else "unweighted", N))

@@ -231,7 +231,7 @@ def _test_nn_with_k_lstm_bits(test_data, lstm, nnet, k=None, quality=True, fix_b
 
         # Set the input for NNet using k bits of Y
         nnet_input = np.concatenate((Y[:k], fy)) if fix_bit_val is None else np.concatenate(
-            (np.array(fix_bit_val), fy))
+            (np.array([fix_bit_val]), fy))
 
         # Sending LSTM output bit combined with last revisions features to Nnet
         y = nnet.forward(nnet_input)
@@ -474,7 +474,7 @@ def test_nn_using_k_lstm_bit(test_dict, lstm, nnet, k=None, quality=True):
     return locals()
 
 
-def test_nn_only(test_dict, lstm, nnet, fix_bit_val):
+def test_nn_only(test_dict, lstm, nnet, fix_bit_val=None):
     """
 
     :param test_dict:

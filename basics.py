@@ -136,7 +136,7 @@ if __name__ == "__main__":
     # print "Neg/All for all revisions", ratio, 2*(ratio)*(1-ratio)
     from learning import train_nn_using_k_lstm_bit, test_nn_using_k_lstm_bit, train_nn_only, test_nn_only, test_random
 
-    N = 20
+    N = 100
     k = 12
     test_only = False
     weighted_learning = False

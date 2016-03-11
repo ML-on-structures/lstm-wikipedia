@@ -7,7 +7,7 @@ from scipy import stats
 import numpy as np
 
 from basics import load_data
-from learning import test_nn_using_k_lstm_bit
+from learning import test_nn_using_k_lstm_bit, _test_nn_with_k_lstm_bits
 import matplotlib.pyplot as plt
 
 FEATURES = {
@@ -110,6 +110,21 @@ def _return_bit_values(test_data, lstm, nnet, k=None, quality=True):
     return errors, y_pred, y_true, label_weights, bits_to_use
 
 
+def test_bit_value(data, lstm, nnet, k):
+    """
+
+    :return:
+    """
+    _, y_0, _, _ = _test_nn_with_k_lstm_bits(data, lstm, nnet, k=1, fix_bit_val=0)
+    _, y_1, _, _ = _test_nn_with_k_lstm_bits(data, lstm, nnet, k=1, fix_bit_val=1)
+
+    dels = [y_1[i] - y_0[i] for i in range(len(y_1))]
+    print dels
+    pos_dels = [i for i in dels if np.sum(i) >0]
+    print pos_dels
+
+
+
 
 def meaning_of_bits(data, lstm, nn, k):
     """
@@ -186,7 +201,7 @@ if __name__ == "__main__":
     _, test = load_data(files=True)
 
     N = 5000
-    k = 14
+    k = 1
     test_only = False
     weighted_learning = False
     balanced = False
@@ -209,7 +224,8 @@ try:
 
     # with open(known_pickle, 'rb') as input:
     #     (lstm, nn) = pickle.load(input)
-    meaning = meaning_of_bits(test, lstm, nn, k=k)
+    #meaning = meaning_of_bits(test, lstm, nn, k=k)
+    bit_test = test_bit_value(test, lstm, nn, k=1)
 
 except IOError, e:
     print e

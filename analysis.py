@@ -110,6 +110,7 @@ def _return_bit_values(test_data, lstm, nnet, k=None, quality=True):
     return errors, y_pred, y_true, label_weights, bits_to_use
 
 
+
 def meaning_of_bits(data, lstm, nn, k):
     """
 

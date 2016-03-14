@@ -136,8 +136,8 @@ if __name__ == "__main__":
     # print "Neg/All for all revisions", ratio, 2*(ratio)*(1-ratio)
     from learning import train_nn_using_k_lstm_bit, test_nn_using_k_lstm_bit, train_nn_only, test_nn_only, test_random
 
-    N = 100
-    k = 12
+    N = 1000
+    k = 3
     test_only = False
     weighted_learning = False
     balanced = True
@@ -158,13 +158,13 @@ if __name__ == "__main__":
                 (lstm, nn) = pickle.load(input)
             test_result = test_nn_only(test, lstm, nn)
         else:
-            # (lstm, nn) = train_nn_using_k_lstm_bit(training, k=k, store=True, N=N, picklefile=picklefile,
-            #                                        weighted_learning=weighted_learning, balanced=balanced)
-            # test_result = test_nn_using_k_lstm_bit(test, lstm, nn, k=k)
+            (lstm, nn) = train_nn_using_k_lstm_bit(training, k=k, store=True, N=N, picklefile=picklefile,
+                                                   weighted_learning=weighted_learning, balanced=balanced)
+            test_result = test_nn_using_k_lstm_bit(test, lstm, nn, k=k)
 
-            (lstm, nn) = train_nn_only(training, store=True, N=N, picklefile=nn_pickle,
-                                        weighted_learning=weighted_learning)
-            test_result = test_nn_only(test, lstm, nn)
+            # (lstm, nn) = train_nn_only(training, store=True, N=N, picklefile=nn_pickle,
+            #                             weighted_learning=weighted_learning)
+            # test_result = test_nn_only(test, lstm, nn)
 
             # print "Oracle Round"
             # oracle_result = test_oracle(test)

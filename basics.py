@@ -137,7 +137,7 @@ if __name__ == "__main__":
     from learning import train_nn_using_k_lstm_bit, test_nn_using_k_lstm_bit, train_nn_only, test_nn_only, test_random
 
     N = 1000
-    k = 3
+    k = 12
     test_only = False
     weighted_learning = False
     balanced = True

@@ -148,7 +148,7 @@ def _train_nn_with_k_lstm_bits(data_list,
             # Now send the loss through NN backpropagation
             bp_res = nnet.backward_adadelta(dy)
 
-            if k < 0 or k is None:
+            if k > 0 or k is None:
                 # Send through LSTM only if its bits count
                 # Generate input for LSTM backward round
                 back_el = np.zeros(Y.shape)

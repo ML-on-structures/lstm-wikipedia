@@ -402,7 +402,7 @@ class DataAccess:
                                               Field('q4', 'double'),
                                               Field('q6', 'double'),
                                               Field('q10', 'double'),
-                                              migrate=True
+                                              migrate=False
                                               )
 
         self.db.commit()
@@ -806,4 +806,4 @@ if __name__ == "__main__":
     #     print "______________________"
 
     # Collect data
-    db.collect_contributions(lim_start=1, lim_end=2)
+    db.collect_contributions(lim_start=1, lim_end=200)

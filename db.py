@@ -289,7 +289,7 @@ def _measure_revision_quality(curr, prev, foll, next_count):
     wjs = []  # weight assigned to jth revision's quality
 
     # Get content of current and previous revisions
-    content_curr = curr[0].get('*', '')
+    content_curr = curr.get('*', '')
     content_prev = prev[0].get('*', '')
 
     # Measure with each next revision
@@ -373,7 +373,7 @@ class DataAccess:
                                               migrate=False
                                               )
 
-        self.revisions2 = self.db.define_table('revisions_2',
+        self.revisions2 = self.db.define_table('revisions_restore',
                                               Field('revid', 'integer', unique=True),
                                               Field('pageid', 'integer'),
                                               Field('rev_timestamp', 'datetime'),
@@ -404,6 +404,8 @@ class DataAccess:
                                               Field('q10', 'double'),
                                               migrate=False
                                               )
+
+        self.db.commit()
 
     def _get_main_normalization_values(self):
 
@@ -481,7 +483,7 @@ class DataAccess:
                 self.authors.completed == False
             )
         users = self.db(q).select(limitby=(lim_start, lim_end))
-
+        print "Length of users: %r"%(len(users))
         # Get revisions for each user from Wikipedia
         for i in users:
 
@@ -509,6 +511,7 @@ class DataAccess:
                 # with each entry of that list being a dict
                 contributions = w.get_user_contributions(username=username,
                                                          cont_limit=50, )
+                print "Contributions by user (%r) are: %r"%(username, len(contributions))
 
                 # Don't operate if it has less than 3 revisions
                 if len(contributions) < 3:
@@ -621,6 +624,7 @@ class DataAccess:
                     feature_dict['time_prev_user_page'] = (t_curr - t_user_page_prev).total_seconds() / (
                         1.0 * SECS_IN_HR * HRS_IN_WEEK) if t_user_page_prev else 0.0
 
+
                     # Fill in remaining entries of revision dict
                     # to be placed in the DB. These include values from
                     # result dict obtained by calling Wikimedia API
@@ -632,6 +636,7 @@ class DataAccess:
                     feature_dict['rev_content'] = content_curr
                     feature_dict['rev_comment'] = curr.get('comment', '')
                     feature_dict['rev_size'] = curr['size']
+                    pprint(feature_dict)
 
                     # Now we need to calculate the quality of this revision by
                     # using a revision prior to it from a different author and
@@ -648,8 +653,9 @@ class DataAccess:
 
                     # Push revision into the DB
 
-                    self.revisions2.update_or_insert(self.revisions2.revid == curr.get('revid'),
+                    insert_return = self.revisions2.update_or_insert(self.revisions2.revid == curr.get('revid'),
                                                        **feature_dict)
+                    print "DB Insert Return: %r"%(insert_return)
                     # Commit at this point to ensure it stays in DB even if something else crashes
                     self.db.commit()
 
@@ -659,8 +665,10 @@ class DataAccess:
                 # Use completed boolean to update authors table flags
                 if completed:
                     updates_user = self.db(self.authors.username == username).update(completed=True)
+                    print "User updated: %r"%(updates_user)
                 else:
                     updates_user = self.db(self.authors.username == username).update(cleaned=False)
+                    print "User updated: %r"%(updates_user)
 
                 self.db.commit()
 
@@ -805,4 +813,4 @@ if __name__ == "__main__":
     #     print "______________________"
 
     # Collect data
-    db.collect_contributions(lim_start=1, lim_end=50)
+    db.collect_contributions(lim_start=1, lim_end=5)

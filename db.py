@@ -632,7 +632,6 @@ class DataAccess:
                     feature_dict['rev_content'] = content_curr
                     feature_dict['rev_comment'] = curr.get('comment', '')
                     feature_dict['rev_size'] = curr['size']
-                    pprint(feature_dict)
 
                     # Now we need to calculate the quality of this revision by
                     # using a revision prior to it from a different author and
@@ -651,7 +650,6 @@ class DataAccess:
 
                     insert_return = self.revisions2.update_or_insert(self.revisions2.revid == curr.get('revid'),
                                                        **feature_dict)
-                    print "DB Insert Return: %r"%(insert_return)
                     # Commit at this point to ensure it stays in DB even if something else crashes
                     self.db.commit()
 
@@ -661,10 +659,9 @@ class DataAccess:
                 # Use completed boolean to update authors table flags
                 if completed:
                     updates_user = self.db(self.authors.username == username).update(completed=True)
-                    print "User updated: %r"%(updates_user)
+                    print "User updated to complete"
                 else:
                     updates_user = self.db(self.authors.username == username).update(cleaned=False)
-                    print "User updated: %r"%(updates_user)
 
                 self.db.commit()
 
@@ -809,4 +806,4 @@ if __name__ == "__main__":
     #     print "______________________"
 
     # Collect data
-    db.collect_contributions(lim_start=1, lim_end=5)
+    db.collect_contributions(lim_start=2, lim_end=5)

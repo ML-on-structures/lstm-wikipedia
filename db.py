@@ -596,12 +596,10 @@ class DataAccess:
                     # Getting time features now by using current, previous and next tinmes.
 
                     # Time from previous revision on page
-                    feature_dict['time_prev_page'] = (t_curr - t_prev_page).total_seconds() / (
-                        1.0 * SECS_IN_HR * HRS_IN_WEEK)
+                    feature_dict['time_prev_page'] = (t_curr - t_prev_page).total_seconds()
 
                     # Time to next on page
-                    feature_dict['time_next_page'] = (t_next_page - t_curr).total_seconds() / (
-                        1.0 * SECS_IN_HR * HRS_IN_WEEK)
+                    feature_dict['time_next_page'] = (t_next_page - t_curr).total_seconds()
 
                     # Time from previous revision by user
                     # The call will include current revision also
@@ -613,16 +611,14 @@ class DataAccess:
                     t_user_prev = datetime.strptime(contribution_before[1].get('timestamp'), DATE_PATTERN) if len(
                         contribution_before) > 1 else 0
 
-                    feature_dict['time_prev_user'] = (t_curr - t_user_prev).total_seconds() / (
-                        1.0 * SECS_IN_HR * HRS_IN_WEEK) if t_user_prev else 0.0
+                    feature_dict['time_prev_user'] = (t_curr - t_user_prev).total_seconds() if t_user_prev else 0.0
 
                     # Time from previous revision by user on this page
                     t_user_page_prev = _get_previous_by_user_on_page(username=username,
                                                                      page=pageid,
                                                                      revision=curr.get('revid', None))
 
-                    feature_dict['time_prev_user_page'] = (t_curr - t_user_page_prev).total_seconds() / (
-                        1.0 * SECS_IN_HR * HRS_IN_WEEK) if t_user_page_prev else 0.0
+                    feature_dict['time_prev_user_page'] = (t_curr - t_user_page_prev).total_seconds() if t_user_page_prev else 0.0
 
 
                     # Fill in remaining entries of revision dict

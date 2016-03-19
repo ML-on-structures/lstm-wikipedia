@@ -648,7 +648,7 @@ class DataAccess:
 
                     # Push revision into the DB
 
-                    self.revisions2.update_or_insert(self.revisions.revid == curr.get('revid'),
+                    self.revisions2.update_or_insert(self.revisions2.revid == curr.get('revid'),
                                                        **feature_dict)
                     # Commit at this point to ensure it stays in DB even if something else crashes
                     self.db.commit()

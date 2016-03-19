@@ -19,8 +19,8 @@ def load_data(files=False, trn_file='training_data.json', tst_file='test_data.js
     """
     print "Loading results"
 
-    trn_file = os.path.join(os.getcwd(), 'results', trn_file)
-    tst_file = os.path.join(os.getcwd(), 'results', tst_file)
+    trn_file = os.path.join(os.getcwd(), 'data', trn_file)
+    tst_file = os.path.join(os.getcwd(), 'data', tst_file)
     try:
         f = open(trn_file, 'r')
         vf = open(tst_file, 'r')

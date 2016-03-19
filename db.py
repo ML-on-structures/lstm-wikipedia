@@ -22,29 +22,7 @@ SECS_IN_HR = 3600
 HRS_IN_WEEK = 168
 
 
-def _get_main_normalization_values():
-    """
-    Contact revisions_extended table and measure required
-    std and avg values per item
-    These are DB level values to be used on individual normalizations
-    :return: Dicrtionary of means and stds.
-    """
-    ret_dict = {}
 
-    data = db.db().select(db.revisions.ALL)
-    com_lengths = [i.rev_comment_length for i in data]
-    ret_dict['com_len_mean'] = np.mean(com_lengths)
-    ret_dict['com_len_std'] = np.std(com_lengths)
-
-    chars_add = [i.chars_added for i in data]
-    ret_dict['char_add_mean'] = np.mean(chars_add)
-    ret_dict['char_add_std'] = np.std(chars_add)
-
-    chars_rem = [i.chars_removed for i in data]
-    ret_dict['char_rem_mean'] = np.mean(chars_rem)
-    ret_dict['char_rem_std'] = np.std(chars_rem)
-
-    return ret_dict
 
 
 def _normalize_inputs(features, gen_values, last_two=False):
@@ -395,6 +373,30 @@ class DataAccess:
                                               migrate=False
                                               )
 
+    def _get_main_normalization_values(self):
+        """
+        Contact revisions_extended table and measure required
+        std and avg values per item
+        These are DB level values to be used on individual normalizations
+        :return: Dicrtionary of means and stds.
+        """
+        ret_dict = {}
+
+        data = self.db().select(self.revisions.ALL)
+        com_lengths = [i.rev_comment_length for i in data]
+        ret_dict['com_len_mean'] = np.mean(com_lengths)
+        ret_dict['com_len_std'] = np.std(com_lengths)
+
+        chars_add = [i.chars_added for i in data]
+        ret_dict['char_add_mean'] = np.mean(chars_add)
+        ret_dict['char_add_std'] = np.std(chars_add)
+
+        chars_rem = [i.chars_removed for i in data]
+        ret_dict['char_rem_mean'] = np.mean(chars_rem)
+        ret_dict['char_rem_std'] = np.std(chars_rem)
+
+        return ret_dict
+
     def collect_contributions(self):
         """
         Get upto 50 first contributions of a user.
@@ -440,12 +442,12 @@ class DataAccess:
         total_rev_count = 0
         # Get users from the table. Controlled by 'cleaned' and 'completed'
         q = (
-                db.authors.user_since > START_TIME) & (
-                db.authors.contributions > 3) & (
-                db.authors.cleaned == True) & (
-                db.authors.completed == False
+                self.authors.user_since > START_TIME) & (
+                self.authors.contributions > 3) & (
+                self.authors.cleaned == True) & (
+                self.authors.completed == False
             )
-        users = self.db(q).select(limitby=(851, 1000))
+        users = self.db(q).select()
 
         # Get revisions for each user from Wikipedia
         for i in users:
@@ -609,7 +611,7 @@ class DataAccess:
                     # print("===== DICT printed====")
 
                     # Push revision into the DB
-                    self.db.revisions.update_or_insert(db.revisions.revid == curr.get('revid'),
+                    self.revisions.update_or_insert(self.revisions.revid == curr.get('revid'),
                                                        **feature_dict)
                     # Commit at this point to ensure it stays in DB even if something else crashes
                     self.db.commit()
@@ -619,9 +621,9 @@ class DataAccess:
 
                 # Use completed boolean to update authors table flags
                 if completed:
-                    updates_user = self.db(db.authors.username == username).update(completed=True)
+                    updates_user = self.db(self.authors.username == username).update(completed=True)
                 else:
-                    updates_user = self.db(db.authors.username == username).update(cleaned=False)
+                    updates_user = self.db(self.authors.username == username).update(cleaned=False)
 
                 self.db.commit()
 
@@ -651,7 +653,7 @@ class DataAccess:
         t_start = time.clock()
 
         # Get users from the DB where revisions are available
-        users = self.db(db.authors.completed == True).select()
+        users = self.db(self.authors.completed == True).select()
 
         # Initialize empty dicts
         training_dict = {}
@@ -659,12 +661,12 @@ class DataAccess:
 
         # Basic normalization values from full Revisions set
         print "Getting base normalization values after %r seconds" % (time.clock() - t_start)
-        main_normalizer_values = _get_main_normalization_values()
+        main_normalizer_values = self._get_main_normalization_values()
 
         # Start getting revisions for each user
         print "Starting the loop after %r seconds" % (time.clock() - t_start)
-        for i in users[:limit_users]:
-            revisions = self.db(db.revisions.username == i.username).select()
+        for i in users:
+            revisions = self.db(self.revisions.username == i.username).select()
 
             # Check to remove small sized entries
             if len(revisions) < 3:

@@ -806,4 +806,4 @@ if __name__ == "__main__":
     #     print "______________________"
 
     # Collect data
-    db.collect_contributions(lim_start=1, lim_end=1500)
+    db.collect_contributions(lim_start=1, lim_end=2)

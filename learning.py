@@ -148,7 +148,7 @@ def _train_nn_with_k_lstm_bits(data_list,
             # Now send the loss through NN backpropagation
             bp_res = nnet.backward_adadelta(dy)
 
-            if k < 0 or k is None:
+            if k > 0 or k is None:
                 # Send through LSTM only if its bits count
                 # Generate input for LSTM backward round
                 back_el = np.zeros(Y.shape)
@@ -179,7 +179,7 @@ def _train_nn_with_k_lstm_bits(data_list,
     return (lstm, nnet), errors
 
 
-def _test_nn_with_k_lstm_bits(test_data, lstm, nnet, k=None, quality=True):
+def _test_nn_with_k_lstm_bits(test_data, lstm, nnet, k=None, quality=True, fix_bit_val=None):
     """
 
     Get the dict of authors as keys and values in form:
@@ -224,13 +224,14 @@ def _test_nn_with_k_lstm_bits(test_data, lstm, nnet, k=None, quality=True):
         if not yt:
             continue
         Y = np.array([])
-        if k > 0 or k is None:
+        if (k > 0 or k is None) and fix_bit_val is None:
             # Run LSTM only if bits from LSTM are required
-            # Compute output from LSTM using 1-(n-1) revisions
+            # Send x features to the wikipedia_lstm and collect output in Y
             Y = lstm.forward(x_mat)
 
         # Set the input for NNet using k bits of Y
-        nnet_input = np.concatenate((Y[:k], fy))
+        nnet_input = np.concatenate((Y[:k], fy)) if fix_bit_val is None else np.concatenate(
+            (np.array([fix_bit_val]), fy))
 
         # Sending LSTM output bit combined with last revisions features to Nnet
         y = nnet.forward(nnet_input)
@@ -473,7 +474,7 @@ def test_nn_using_k_lstm_bit(test_dict, lstm, nnet, k=None, quality=True):
     return locals()
 
 
-def test_nn_only(test_dict, lstm, nnet):
+def test_nn_only(test_dict, lstm, nnet, fix_bit_val=None):
     """
 
     :param test_dict:
@@ -489,7 +490,7 @@ def test_nn_only(test_dict, lstm, nnet):
     #     nnet = Serializable.loads(json.load(input))
 
     # Send test results with trained model for testing
-    errors, y_pred, y_true, label_weights = _test_nn_with_k_lstm_bits(test_dict, lstm, nnet, k=0)
+    errors, y_pred, y_true, label_weights = _test_nn_with_k_lstm_bits(test_dict, lstm, nnet, k=0, fix_bit_val=fix_bit_val)
 
     precision, recall, f_score = _error_measurement(y_pred, y_true, label_weights)
 

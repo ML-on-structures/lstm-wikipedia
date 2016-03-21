@@ -834,5 +834,7 @@ if __name__ == "__main__":
     # db.collect_contributions(lim_start=100, lim_end=3200)
 
     # Previous list round
+    print "Getting list of previous users"
     user_list = db.get_list_from_previous()
-    db.collect_contributions(lim_start=1, lim_end=5800, user_list=user_list)
+    print "List now available with %r users"%(len(user_list))
+    db.collect_contributions(lim_start=1, lim_end=1000, user_list=user_list)

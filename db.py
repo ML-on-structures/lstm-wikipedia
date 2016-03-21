@@ -1,6 +1,7 @@
 import json
 import os
 import random
+import re
 from pprint import pprint
 
 import numpy as np
@@ -479,10 +480,11 @@ class DataAccess:
         q = (
                 self.authors.user_since > START_TIME) & (
                 self.authors.contributions > 3) & (
-                self.authors.cleaned == True) & (
+                #self.authors.cleaned == True) & (
                 self.authors.completed == False
             )
         users = self.db(q).select(limitby=(lim_start, lim_end))
+
         print "Length of users: %r"%(len(users))
         # Get revisions for each user from Wikipedia
         for i in users:
@@ -497,6 +499,13 @@ class DataAccess:
             # Since we have a really large number of users, we can avoid
             # such issues by not using the users.
             try:
+
+                # Remove if it is a bot
+                if re.search("bot",i['username'],re.IGNORECASE):
+                    self.db(self.authors.id == i['id']).delete()
+                    print("{} deleted".format(i['username']))
+                    continue
+
                 # Basic user values available in 'authors' table
                 username = i['username']
                 cont_count = i['contributions']
@@ -806,4 +815,4 @@ if __name__ == "__main__":
     #     print "______________________"
 
     # Collect data
-    db.collect_contributions(lim_start=1, lim_end=200)
+    db.collect_contributions(lim_start=100, lim_end=3200)

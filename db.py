@@ -433,7 +433,16 @@ class DataAccess:
 
         return ret_dict
 
-    def collect_contributions(self, lim_start=1, lim_end=1000):
+    def get_list_from_previous(self):
+        """
+
+        :return:
+        """
+        user_list = self.db().select(self.revisions.username, distinct=True)
+
+        return user_list
+
+    def collect_contributions(self, lim_start=1, lim_end=1000, user_list=None):
         """
         Get upto 50 first contributions of a user.
         Users are already pre-fetched into the DB.
@@ -483,7 +492,10 @@ class DataAccess:
                 #self.authors.cleaned == True) & (
                 self.authors.completed == False
             )
-        users = self.db(q).select(limitby=(lim_start, lim_end))
+        if not user_list:
+            users = self.db(q).select(limitby=(lim_start, lim_end))
+        else:
+            users = user_list
 
         print "Length of users: %r"%(len(users))
         # Get revisions for each user from Wikipedia
@@ -500,15 +512,19 @@ class DataAccess:
             # such issues by not using the users.
             try:
 
-                # Remove if it is a bot
-                if re.search("bot",i['username'],re.IGNORECASE):
-                    self.db(self.authors.id == i['id']).delete()
-                    print("{} deleted".format(i['username']))
-                    continue
+                if not user_list:
 
-                # Basic user values available in 'authors' table
-                username = i['username']
-                cont_count = i['contributions']
+                    # Remove if it is a bot
+                    if re.search("bot",i['username'],re.IGNORECASE):
+                        self.db(self.authors.id == i['id']).delete()
+                        print("{} deleted".format(i['username']))
+                        continue
+
+                    # Basic user values available in 'authors' table
+                    username = i['username']
+
+                else:
+                    username = i['username']
 
                 # Initialize a boolean to control completion of record
                 completed = True
@@ -815,4 +831,8 @@ if __name__ == "__main__":
     #     print "______________________"
 
     # Collect data
-    db.collect_contributions(lim_start=100, lim_end=3200)
+    # db.collect_contributions(lim_start=100, lim_end=3200)
+
+    # Previous list round
+    user_list = db.get_list_from_previous()
+    db.collect_contributions(lim_start=1, lim_end=5800, user_list=user_list)

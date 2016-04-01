@@ -840,7 +840,7 @@ class DataAccess:
         """
         w = WikiFetch
 
-        revs = self.db().select(self.revisions.ALL)
+        revs = self.db().select(self.revisions2.ALL)
 
         for i in revs[:10]:
             revid = i.revid

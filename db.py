@@ -844,7 +844,7 @@ class DataAccess:
 
         revs = self.db().select(self.revisions2.ALL)
 
-        for i in revs[:10]:
+        for i in revs:
             revid = i.revid
             pageid = i.pageid
 

@@ -53,10 +53,10 @@ def fast_compute_edit_list(s1, s2):
         k += 1
     final_move = None if k == 0 else (MOVE, l1 - k, l2 - k, k)
     idx = make_index_tichy(s2[j: l2 - k])
-    intermediate, added_words = edit_diff_tichy(s1[j: l1 - k], s2[j: l2 - k], idx)
+    intermediate, added_words, deleted_words = edit_diff_tichy(s1[j: l1 - k], s2[j: l2 - k], idx)
 
     new_intermediate = [(m, i1 + j, i2 + j, l) for (m, i1, i2, l) in intermediate]
-    return initial_move, new_intermediate, final_move, added_words
+    return initial_move, new_intermediate, final_move, added_words, deleted_words
 
 
 ################################################################

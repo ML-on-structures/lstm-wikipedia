@@ -852,6 +852,12 @@ class DataAccess:
                                                    start_rev=revid,
                                                    chunk_size=1, )
 
+            if not curr:
+                completed = False
+                continue
+
+            # Get individual entry from list curr
+            curr = curr[0]
 
             # Extract parent ID
             t_curr = datetime.strptime(curr.get('timestamp'), DATE_PATTERN)
@@ -868,7 +874,7 @@ class DataAccess:
             # Do not use the revision if parent_rev can't be fetched.
             if not parent_rev:
                 completed = False
-                break
+                continue
 
             # Basic features of parent revision
             parent_rev = parent_rev[0]

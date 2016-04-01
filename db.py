@@ -818,6 +818,26 @@ class DataAccess:
 
         return training_dict, test_dict
 
+    def get_missing_data(self):
+        """
+        Iterate over existing data and fill the missing fields.
+        Get parent revision id and content for each revision.
+        Get removed text from revision
+        """
+        revs = self.db().select(self.revisions.ALL)
+
+        for i in revs:
+            revid = i.revid
+
+            # Get revision for revid
+
+            # Extract parent ID
+
+            # Get revision for parent ID
+
+            # Collect removed text
+
+        print len(revs)
 
 if __name__ == "__main__":
     db = DataAccess()
@@ -834,7 +854,9 @@ if __name__ == "__main__":
     # db.collect_contributions(lim_start=100, lim_end=3200)
 
     # Previous list round
-    print "Getting list of previous users"
-    user_list = db.get_list_from_previous()
-    print "List now available with %r users"%(len(user_list))
-    db.collect_contributions(lim_start=1, lim_end=1000, user_list=user_list)
+    # print "Getting list of previous users"
+    # user_list = db.get_list_from_previous()
+    # print "List now available with %r users"%(len(user_list))
+    # db.collect_contributions(lim_start=1, lim_end=1000, user_list=user_list)
+
+    db.get_missing_data()

@@ -360,6 +360,7 @@ class DataAccess:
         self.revisions = self.db.define_table('revisions_extended',
                                               Field('revid', 'integer', unique=True),
                                               Field('pageid', 'integer'),
+                                              Field('parentid', 'integer'),
                                               Field('rev_timestamp', 'datetime'),
                                               Field('rev_comment'),
                                               Field('username'),
@@ -380,6 +381,7 @@ class DataAccess:
                                               Field('upper_lower_ratio', 'double'),
                                               Field('digit_total_ratio', 'double'),
                                               Field('revision_added_text', 'text'),
+                                              Field('revision_deleted_text', 'text'),
                                               Field('processed', 'boolean', default=False),
                                               Field('quality', 'double'),
                                               migrate=False
@@ -840,7 +842,7 @@ class DataAccess:
         """
         w = WikiFetch
 
-        revs = self.db().select(self.revisions2.ALL)
+        revs = self.db().select(self.revisions.ALL)
 
         for i in revs[:10]:
             revid = i.revid
@@ -885,7 +887,7 @@ class DataAccess:
             feature_dict = _get_distances(content_curr, content_parent)
 
             i.update_record(revision_deleted_text=feature_dict['revision_deleted_text'], parentid=parent_curr)
-
+            self.db.commit()
         print len(revs)
 
 if __name__ == "__main__":

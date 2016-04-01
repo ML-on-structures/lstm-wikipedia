@@ -416,7 +416,7 @@ class DataAccess:
                                               Field('q4', 'double'),
                                               Field('q6', 'double'),
                                               Field('q10', 'double'),
-                                              migrate=True
+                                              migrate=False
                                               )
 
         self.db.commit()

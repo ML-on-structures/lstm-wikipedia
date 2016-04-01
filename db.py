@@ -158,7 +158,7 @@ def _get_distances(r1, r2, distance_only=False):
     l2 = r2.split()  # tokenize second revision
 
     # Compute distance using chdiff
-    x, w, y, added_words = chdiff.fast_compute_edit_list(l1, l2)
+    x, w, y, added_words, deleted_words = chdiff.fast_compute_edit_list(l1, l2)
     minlen = min(len(l1), len(l2))
 
     # Get list of distances from chdiff
@@ -206,6 +206,17 @@ def _get_distances(r1, r2, distance_only=False):
     # Words added in the revision are stored as a long string of
     # each word chunk separated by semicolon
     results['revision_added_text'] = added_text[:5000]
+
+    # Generate deleted text from the changes
+    # Added text
+    deleted_text = ""
+    for word in deleted_words:
+        for t in word:
+            deleted_text = deleted_text + unicode(t) + " "
+        deleted_text += "; "
+    # Words added in the revision are stored as a long string of
+    # each word chunk separated by semicolon
+    results['revision_deleted_text'] = deleted_text[:5000]
 
     # Measure ratios for added text data
 
@@ -377,6 +388,7 @@ class DataAccess:
         self.revisions2 = self.db.define_table('revisions_restore',
                                               Field('revid', 'integer', unique=True),
                                               Field('pageid', 'integer'),
+                                              Field('parentid', 'integer'),
                                               Field('rev_timestamp', 'datetime'),
                                               Field('rev_comment'),
                                               Field('username'),
@@ -399,11 +411,12 @@ class DataAccess:
                                               Field('upper_lower_ratio', 'double'),
                                               Field('digit_total_ratio', 'double'),
                                               Field('revision_added_text', 'text'),
+                                              Field('revision_deleted_text', 'text'),
                                               Field('processed', 'boolean', default=False),
                                               Field('q4', 'double'),
                                               Field('q6', 'double'),
                                               Field('q10', 'double'),
-                                              migrate=False
+                                              migrate=True
                                               )
 
         self.db.commit()
@@ -651,6 +664,7 @@ class DataAccess:
                     # result dict obtained by calling Wikimedia API
                     feature_dict['revid'] = curr.get('revid')
                     feature_dict['pageid'] = pageid
+                    feature_dict['parentid'] = parent_curr
                     feature_dict['username'] = username
                     feature_dict['rev_timestamp'] = t_curr  # To get it as datetime type
                     feature_dict['userid'] = curr['userid']
@@ -824,18 +838,47 @@ class DataAccess:
         Get parent revision id and content for each revision.
         Get removed text from revision
         """
+        w = WikiFetch
+
         revs = self.db().select(self.revisions.ALL)
 
-        for i in revs:
+        for i in revs[:10]:
             revid = i.revid
+            pageid = i.pageid
 
             # Get revision for revid
 
-            # Extract parent ID
+            curr = w.fetch_revisions_for_page(pageid=pageid,
+                                                   start_rev=revid,
+                                                   chunk_size=1, )
 
-            # Get revision for parent ID
+
+            # Extract parent ID
+            t_curr = datetime.strptime(curr.get('timestamp'), DATE_PATTERN)
+            content_curr = curr.get('*', '')
+            parent_curr = curr.get('parentid', None)
+
+            # Get parent revision of current using parentID
+            # Features of parent revision are required in order to
+            # measure distance and char update values of this revision
+            parent_rev = w.fetch_revisions_for_page(pageid=pageid,
+                                                    start_rev=parent_curr,
+                                                    chunk_size=1, )
+
+            # Do not use the revision if parent_rev can't be fetched.
+            if not parent_rev:
+                completed = False
+                break
+
+            # Basic features of parent revision
+            parent_rev = parent_rev[0]
+            content_parent = parent_rev.get('*', '')
+            t_prev_page = datetime.strptime(parent_rev.get('timestamp'), DATE_PATTERN)
 
             # Collect removed text
+            feature_dict = _get_distances(content_curr, content_parent)
+
+            i.update_record(revision_deleted_text=feature_dict['revision_deleted_text'], parentid=parent_curr)
 
         print len(revs)
 
@@ -859,4 +902,5 @@ if __name__ == "__main__":
     # print "List now available with %r users"%(len(user_list))
     # db.collect_contributions(lim_start=1, lim_end=1000, user_list=user_list)
 
+    # Get missing data per entry. Then improve rest
     db.get_missing_data()

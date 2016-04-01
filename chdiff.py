@@ -366,6 +366,7 @@ def edit_diff_tichy (w1, w2, idx2):
     # Looks for longest matches of strings in chunk2, starting from start2.
     diff = [] # list of differences
     added_words = []  # list of added words
+    deleted_words = []  # list of deleted words
     i2 = 0
     # This is the first unmatched element on side 2.
     first_unmatched_2 = 0
@@ -395,6 +396,7 @@ def edit_diff_tichy (w1, w2, idx2):
                 #  First, inserts the unmatched part of words2, if needed.
                 if i2 > first_unmatched_2:
                     diff.append ( (DELETE, first_unmatched_2, first_unmatched_2, i2 - first_unmatched_2) )
+                    deleted_words.append(words1[first_unmatched_2:i2])
                 # Then, inserts the match
                 (l_m, i1_m) = best_match
                 diff.append ( (MOVE, i2, i1_m, l_m) )
@@ -414,6 +416,7 @@ def edit_diff_tichy (w1, w2, idx2):
     if len2 > first_unmatched_2:
         # Issue a Block Insert for the final unmatched part
         diff.append( (DELETE, first_unmatched_2, first_unmatched_2, len2 - first_unmatched_2) )
+        deleted_words.append(words1[first_unmatched_2:len2])
 
     # Ok! Now all that remains to do is to produce the list of unmatched portions of word1.
     in_string = False
@@ -433,7 +436,7 @@ def edit_diff_tichy (w1, w2, idx2):
         added_words.append(words2[unm_start:len1])
 
     # All done!
-    return diff, added_words
+    return diff, added_words, deleted_words
 
 
 def print_edit_diff(diff_cmds):

@@ -842,9 +842,9 @@ class DataAccess:
         """
         w = WikiFetch
 
-        revs = self.db().select(self.revisions2.ALL)
+        revs = self.db(self.revisions2.id>106154).select()
 
-        for i in revs:
+        for cnt,i in enumerate(revs):
             revid = i.revid
             pageid = i.pageid
 
@@ -888,6 +888,8 @@ class DataAccess:
 
             i.update_record(revision_deleted_text=feature_dict['revision_deleted_text'], parentid=parent_curr)
             self.db.commit()
+            if random.random() > 0.90:
+                print "Done with revisions %r which is at position %r"%(revid, cnt)
         print len(revs)
 
 if __name__ == "__main__":

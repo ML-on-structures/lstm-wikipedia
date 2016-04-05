@@ -12,6 +12,7 @@ from pydal import DAL, Field
 
 import chdiff
 from editdist import edit_distance
+from json_plus import Serializable
 from serializer import json_to_data, data_to_json
 from wikipedia import WikiFetch
 
@@ -808,7 +809,7 @@ class DataAccess:
             # Structure of each entry in the dicts is like:
             #       {author: (Matrix of past revisions vs. features,
             #                   Features of the nth revision,
-            #                   Quality (label) of the nth revisoin)}
+            #                   Quality (label) of the nth revision)}
             if random.random() > 0.20:
                 training_dict[i.username] = (mat_ur, vect_y_features, y_quality)
             else:
@@ -817,7 +818,7 @@ class DataAccess:
             # Store:
             if store:
                 # Store the entries into json files
-                training_file = os.path.join(os.getcwd(), 'data', 'trainig_data.json')
+                training_file = os.path.join(os.getcwd(), 'data', 'training_data.json')
                 test_file = os.path.join(os.getcwd(), 'data', 'test_data.json')
                 try:
                     # Try to backup last data
@@ -831,6 +832,20 @@ class DataAccess:
 
                 with open(test_file, 'wb') as output:
                     json.dump(data_to_json(test_dict), output)
+
+                # Store using Serializer from JSON Plus
+
+                ser_trn_file = os.path.join(os.getcwd(), 'data', 'ser_training_data.json')
+                ser_test_file = os.path.join(os.getcwd(), 'data', 'ser_test_data.json')
+
+                ser_trn_struct = Serializable.dumps(training_dict)
+                ser_test_struct = Serializable.dumps(test_dict)
+
+                with open(ser_trn_file, 'wb') as output:
+                    json.dump(ser_trn_struct, output)
+
+                with open(ser_test_file, 'wb') as output:
+                    json.dump(ser_test_struct, output)
 
         return training_dict, test_dict
 
@@ -913,4 +928,5 @@ if __name__ == "__main__":
     # db.collect_contributions(lim_start=1, lim_end=1000, user_list=user_list)
 
     # Get missing data per entry. Then improve rest
-    db.get_missing_data()
+
+    db.load_fresh_from_db()

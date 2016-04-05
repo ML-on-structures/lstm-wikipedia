@@ -746,7 +746,7 @@ class DataAccess:
         # Start getting revisions for each user
         print "Starting the loop after %r seconds" % (time.clock() - t_start)
         for i in users:
-            revisions = self.db(self.revisions.username == i.username).select()
+            revisions = self.db(self.revisions2.username == i.username).select()
 
             # Check to remove small sized entries
             if len(revisions) < 3:

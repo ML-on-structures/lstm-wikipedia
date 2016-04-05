@@ -434,7 +434,7 @@ class DataAccess:
         """
         ret_dict = {}
 
-        data = self.db().select(self.revisions.ALL)
+        data = self.db().select(self.revisions2.ALL)
         com_lengths = [i.rev_comment_length for i in data]
         ret_dict['com_len_mean'] = np.mean(com_lengths)
         ret_dict['com_len_std'] = np.std(com_lengths)

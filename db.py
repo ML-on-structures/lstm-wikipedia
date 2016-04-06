@@ -775,7 +775,7 @@ class DataAccess:
                      c.upper_lower_ratio,
                      c.digit_total_ratio,
                      c.time_next_page,
-                     c.quality]
+                     c.q10]
 
                 # Get normalized values for features
                 l_normalized = _normalize_inputs(l, main_normalizer_values, last_two=True)
@@ -803,7 +803,7 @@ class DataAccess:
 
             # Quality of last (nth) revision. At this point it is not normalized and is in range [-1,1]
             # The quality when used for loss measurement needs to be normalized (by scaling it into [0,1] range)
-            y_quality = last_row.quality
+            y_quality = last_row.q10
 
             # Randomly distribute to training and test
             # Structure of each entry in the dicts is like:

@@ -58,7 +58,7 @@ def _normalize_inputs(features, gen_values, last_two=False):
     # Time values - 0,1,2
     # Clip them
     # print features
-    norm_list = [np.clip(i, 0.0, 1.0) for i in features[:3]]
+    norm_list = [np.clip(1.0*i/(1.0*SECS_IN_HR*HRS_IN_WEEK), 0.0, 1.0) for i in features[:3]]
 
     # Char measurement -3,4
     # Z-score
@@ -106,7 +106,7 @@ def _normalize_inputs(features, gen_values, last_two=False):
     if last_two:
         # Time to next -12
         # Unchanged
-        norm_list.append(features[12])
+        norm_list.append((features[12]*1.0)/(1.0*SECS_IN_HR*HRS_IN_WEEK))
 
         # Quality -12
         # Scale

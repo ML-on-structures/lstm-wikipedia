@@ -24,9 +24,6 @@ SECS_IN_HR = 3600
 HRS_IN_WEEK = 168
 
 
-
-
-
 def _normalize_inputs(features, gen_values, last_two=False):
     """
     Normalize the set of features to be in the range [0,1]
@@ -58,7 +55,7 @@ def _normalize_inputs(features, gen_values, last_two=False):
     # Time values - 0,1,2
     # Clip them
     # print features
-    norm_list = [np.clip(1.0*i/(1.0*SECS_IN_HR*HRS_IN_WEEK), 0.0, 1.0) for i in features[:3]]
+    norm_list = [np.clip(1.0 * i / (1.0 * SECS_IN_HR * HRS_IN_WEEK), 0.0, 1.0) for i in features[:3]]
 
     # Char measurement -3,4
     # Z-score
@@ -106,7 +103,7 @@ def _normalize_inputs(features, gen_values, last_two=False):
     if last_two:
         # Time to next -12
         # Unchanged
-        norm_list.append((features[12]*1.0)/(1.0*SECS_IN_HR*HRS_IN_WEEK))
+        norm_list.append((features[12] * 1.0) / (1.0 * SECS_IN_HR * HRS_IN_WEEK))
 
         # Quality -12
         # Scale
@@ -389,38 +386,38 @@ class DataAccess:
                                               )
 
         self.revisions2 = self.db.define_table('revisions_restore',
-                                              Field('revid', 'integer', unique=True),
-                                              Field('pageid', 'integer'),
-                                              Field('parentid', 'integer'),
-                                              Field('rev_timestamp', 'datetime'),
-                                              Field('rev_comment'),
-                                              Field('username'),
-                                              Field('userid', 'integer'),
-                                              Field('rev_content', 'text'),
-                                              Field('rev_size'),
-                                              Field('time_prev_user', 'double'),
-                                              Field('time_prev_page', 'double'),
-                                              Field('time_prev_user_page', 'double'),
-                                              Field('time_next_page', 'double'),
-                                              Field('current_rev_length', 'integer'),
-                                              Field('parent_rev_length', 'integer'),
-                                              Field('chars_added', 'integer'),
-                                              Field('chars_removed', 'integer'),
-                                              Field('spread', 'double'),
-                                              Field('position_in_page', 'double'),
-                                              Field('time_in_day', 'double'),
-                                              Field('day_of_week', 'integer'),
-                                              Field('rev_comment_length', 'integer'),
-                                              Field('upper_lower_ratio', 'double'),
-                                              Field('digit_total_ratio', 'double'),
-                                              Field('revision_added_text', 'text'),
-                                              Field('revision_deleted_text', 'text'),
-                                              Field('processed', 'boolean', default=False),
-                                              Field('q4', 'double'),
-                                              Field('q6', 'double'),
-                                              Field('q10', 'double'),
-                                              migrate=False
-                                              )
+                                               Field('revid', 'integer', unique=True),
+                                               Field('pageid', 'integer'),
+                                               Field('parentid', 'integer'),
+                                               Field('rev_timestamp', 'datetime'),
+                                               Field('rev_comment'),
+                                               Field('username'),
+                                               Field('userid', 'integer'),
+                                               Field('rev_content', 'text'),
+                                               Field('rev_size'),
+                                               Field('time_prev_user', 'double'),
+                                               Field('time_prev_page', 'double'),
+                                               Field('time_prev_user_page', 'double'),
+                                               Field('time_next_page', 'double'),
+                                               Field('current_rev_length', 'integer'),
+                                               Field('parent_rev_length', 'integer'),
+                                               Field('chars_added', 'integer'),
+                                               Field('chars_removed', 'integer'),
+                                               Field('spread', 'double'),
+                                               Field('position_in_page', 'double'),
+                                               Field('time_in_day', 'double'),
+                                               Field('day_of_week', 'integer'),
+                                               Field('rev_comment_length', 'integer'),
+                                               Field('upper_lower_ratio', 'double'),
+                                               Field('digit_total_ratio', 'double'),
+                                               Field('revision_added_text', 'text'),
+                                               Field('revision_deleted_text', 'text'),
+                                               Field('processed', 'boolean', default=False),
+                                               Field('q4', 'double'),
+                                               Field('q6', 'double'),
+                                               Field('q10', 'double'),
+                                               migrate=False
+                                               )
 
         self.db.commit()
 
@@ -505,7 +502,7 @@ class DataAccess:
         q = (
                 self.authors.user_since > START_TIME) & (
                 self.authors.contributions > 3) & (
-                #self.authors.cleaned == True) & (
+                # self.authors.cleaned == True) & (
                 self.authors.completed == False
             )
         if not user_list:
@@ -513,7 +510,7 @@ class DataAccess:
         else:
             users = user_list
 
-        print "Length of users: %r"%(len(users))
+        print "Length of users: %r" % (len(users))
         # Get revisions for each user from Wikipedia
         for i in users:
 
@@ -531,7 +528,7 @@ class DataAccess:
                 if not user_list:
 
                     # Remove if it is a bot
-                    if re.search("bot",i['username'],re.IGNORECASE):
+                    if re.search("bot", i['username'], re.IGNORECASE):
                         self.db(self.authors.id == i['id']).delete()
                         print("{} deleted".format(i['username']))
                         continue
@@ -552,7 +549,7 @@ class DataAccess:
                 # with each entry of that list being a dict
                 contributions = w.get_user_contributions(username=username,
                                                          cont_limit=50, )
-                print "Contributions by user (%r) are: %r"%(username, len(contributions))
+                print "Contributions by user (%r) are: %r" % (username, len(contributions))
 
                 # Don't operate if it has less than 3 revisions
                 if len(contributions) < 3:
@@ -659,8 +656,8 @@ class DataAccess:
                                                                      page=pageid,
                                                                      revision=curr.get('revid', None))
 
-                    feature_dict['time_prev_user_page'] = (t_curr - t_user_page_prev).total_seconds() if t_user_page_prev else 0.0
-
+                    feature_dict['time_prev_user_page'] = (
+                        t_curr - t_user_page_prev).total_seconds() if t_user_page_prev else 0.0
 
                     # Fill in remaining entries of revision dict
                     # to be placed in the DB. These include values from
@@ -691,7 +688,7 @@ class DataAccess:
                     # Push revision into the DB
 
                     insert_return = self.revisions2.update_or_insert(self.revisions2.revid == curr.get('revid'),
-                                                       **feature_dict)
+                                                                     **feature_dict)
                     # Commit at this point to ensure it stays in DB even if something else crashes
                     self.db.commit()
 
@@ -857,17 +854,17 @@ class DataAccess:
         """
         w = WikiFetch
 
-        revs = self.db(self.revisions2.id>106154).select()
+        revs = self.db(self.revisions2.id > 106154).select()
 
-        for cnt,i in enumerate(revs):
+        for cnt, i in enumerate(revs):
             revid = i.revid
             pageid = i.pageid
 
             # Get revision for revid
 
             curr = w.fetch_revisions_for_page(pageid=pageid,
-                                                   start_rev=revid,
-                                                   chunk_size=1, )
+                                              start_rev=revid,
+                                              chunk_size=1, )
 
             if not curr:
                 completed = False
@@ -904,8 +901,112 @@ class DataAccess:
             i.update_record(revision_deleted_text=feature_dict['revision_deleted_text'], parentid=parent_curr)
             self.db.commit()
             if random.random() > 0.90:
-                print "Done with revisions %r which is at position %r"%(revid, cnt)
+                print "Done with revisions %r which is at position %r" % (revid, cnt)
         print len(revs)
+
+    def generate_deep_data(self,
+                           depth=3,
+                           feature_vector=None,
+                           max_elements_per_sequence=None,
+                           sequence_fetch_method="window",
+                           sequencing_function="time_linear",
+                           module_type=None,
+                           store=True,
+                           json_base_file_name="deep_data"
+                           ):
+        """
+
+        For required depth of deep network, get the data from Wikipedia and store it in DB if not available
+
+        Start from the available set of users, and start going down along their available set of revisions.
+        For each revision get the revision on that page as per sequence_fetch_method
+
+        As per the depth, toggle between user and page and keep filling data into this depth structure
+
+        So how to get this data?
+        We know that our top layer closest to decision NN takes as input, revisions by a user.
+        So that's the base. As per our available set, we start by getting revisions by each user.
+        Now while doing this, for each user, we need to:
+            Get the set of revisions, but each revision should have info about page.
+            So while dealing with this revision r, we get info from module on lower layer
+            about the page using a sequencing strategy decided for that layer.
+                Now each revision in this layer should have this extra info about author of revision.
+                So get this from a lower layer.
+                    And this can continue ..
+
+        So finally at the deepest layer, we can perform a full round of training
+        since data is definitely available there at once.
+        This data is therefore gonna be structured like nested dicts.
+        Something like:
+
+        output_dict = {
+            'author1': {
+                'rev1_a1': {
+                    'features': [],
+                    'pageid': 0000,
+                    'page_vector': {
+                        'rev1_p1': {
+                            'features': [],
+                            'author': 'authorx',
+                            'author_vector':
+                                {...}
+                        },
+
+                        'rev2_p1': {
+                            'features': [],
+                            'author': 'authorx',
+                            'author_vector':
+                                {...}
+                        }
+                    }
+                },
+                'rev2_a1': {
+                    'features': [],
+                    'pageid': 0000,
+                    'page_vector': {
+                        'rev1_p1': {
+                            'features': [],
+                            'author': 'authorx',
+                            'author_vector':
+                                {...}
+                        }
+                    }
+                }
+            }
+
+        }
+
+        To get this structure of data, we keep a check on our achieved depth, and while it stays
+        than the given depth, we keep on going down. On the lowest layer, we complete the
+        number of revisions to retrieve and go up, doing the same for each piece of data we have
+
+
+        :param depth:
+        :type depth:
+        :param feature_vector:
+        :type feature_vector:
+        :param max_elements_per_sequence:
+        :type max_elements_per_sequence:
+        :param sequence_fetch_method:
+        :type sequence_fetch_method:
+        :param sequencing_function:
+        :type sequencing_function:
+        :param module_type:
+        :type module_type:
+        :param store:
+        :type store:
+        :param json_base_file_name:
+        :type json_base_file_name:
+        :return:
+        :rtype:
+        """
+
+        # Get users from the DB where revisions are available
+        users = self.db(self.authors.completed == True).select()
+
+
+
+
 
 if __name__ == "__main__":
     db = DataAccess()

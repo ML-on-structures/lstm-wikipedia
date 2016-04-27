@@ -182,7 +182,8 @@ class WikiFetch:
                                  continuous=False,
                                  exclude=None,
                                  include=None,
-                                 direction=None):
+                                 direction=None,
+                                 props=None):
         """
         This function connects to Wikipedia and extracts all results for revisions
         of page with pageid.
@@ -206,6 +207,9 @@ class WikiFetch:
         wiki_access["pageids"] = pageid
         wiki_access['rvlimit'] = chunk_size
 
+        if props is not None:
+            wiki_access['rvprop'] = props
+
         # Set start ID if provided. Else it remains None which means
         # revisions start at the very first revision of page
         if start_rev is not None and start_rev != "null":
@@ -223,6 +227,7 @@ class WikiFetch:
             # print wiki_access
         # GET the revisions from Wikipedia
         result = _get(url=WIKI_BASE_URL, values=wiki_access)
+        pprint(result)
 
         pageid = unicode(pageid)
 

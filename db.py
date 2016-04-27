@@ -337,6 +337,60 @@ def _measure_revision_quality(curr, prev, foll, next_count):
     return quality
 
 
+def get_user_contributions(username, sequence_fetch_method, sequencing_function, max_elements_per_sequence):
+    """
+
+    :param username:
+    :type username:
+    :param sequence_fetch_method:
+    :type sequence_fetch_method:
+    :param sequencing_function:
+    :type sequencing_function:
+    :param max_elements_per_sequence:
+    :type max_elements_per_sequence:
+    :return:
+    :rtype:
+    """
+
+    if sequence_fetch_method == "latest":
+        # Get latest set of values
+        contributions = WikiFetch.get_user_contributions(username=username,
+                                                         cont_limit=max_elements_per_sequence)
+        return contributions
+
+    pass
+
+
+def get_features_for_revision(revid):
+    pass
+
+
+def get_revisions_on_page(pageid, sequence_fetch_method, sequencing_function, max_elements_per_sequence):
+    """
+
+    :param pageid:
+    :type pageid:
+    :param sequence_fetch_method:
+    :type sequence_fetch_method:
+    :param sequencing_function:
+    :type sequencing_function:
+    :param max_elements_per_sequence:
+    :type max_elements_per_sequence:
+    :return:
+    :rtype:
+    """
+
+    if sequence_fetch_method == "latest":
+        print sequence_fetch_method
+        # Get the set of revisions on this page
+        revisions = WikiFetch.fetch_revisions_for_page(pageid=pageid,
+                                                       props="ids|timestamp|user|userid",
+                                                       chunk_size=max_elements_per_sequence)
+        print revisions
+
+        return revisions
+
+
 class DataAccess:
     """
 
@@ -420,6 +474,8 @@ class DataAccess:
                                                )
 
         self.db.commit()
+
+        self.wiki = WikiFetch()
 
     def _get_main_normalization_values(self):
 
@@ -908,11 +964,13 @@ class DataAccess:
                            depth=3,
                            feature_vector=None,
                            max_elements_per_sequence=None,
-                           sequence_fetch_method="window",
-                           sequencing_function="time_linear",
+                           sequence_fetch_method=None,
+                           sequencing_function=None,
+                           condition_list=None,
                            module_type=None,
                            store=True,
-                           json_base_file_name="deep_data"
+                           json_base_file_name="deep_data",
+                           initial_limiter = None
                            ):
         """
 
@@ -1001,11 +1059,276 @@ class DataAccess:
         :rtype:
         """
 
+        ret_dict = {}
+
         # Get users from the DB where revisions are available
         users = self.db(self.authors.completed == True).select()
 
+        if condition_list is None:
+            condition_list = ['user' if not i % 2 else 'page' for i in range(depth)]
 
+        if max_elements_per_sequence is None:
+            max_elements_per_sequence = [5 for _ in range(depth)]
 
+        if sequence_fetch_method is None:
+            sequence_fetch_method = ['latest' for _ in range(depth)]
+
+        if sequencing_function is None:
+            sequencing_function = ['time' for _ in range(depth)]
+
+        layer_level = 0
+
+        for user in users[:initial_limiter]:
+            v = self.get_revisions_for_model(condition_list=condition_list,
+                                         depth=depth,
+                                         layer_level=layer_level,
+                                         feature_vector=feature_vector,
+                                         max_elements_per_sequence=max_elements_per_sequence,
+                                         sequence_fetch_method=sequence_fetch_method,
+                                         sequencing_function=sequencing_function,
+                                         module_type=None,
+                                         item_val='',
+                                         starter_value=user['username']
+                                         )
+
+            ret_dict[user['username']] = v
+        return ret_dict
+
+    def get_revisions_for_model(self, condition_list, depth, layer_level, feature_vector, max_elements_per_sequence,
+                                sequence_fetch_method, sequencing_function, module_type, item_val, starter_value):
+
+        if layer_level < depth:
+            # Condition of user
+            if condition_list[layer_level] == 'user':
+                print condition_list[layer_level]
+
+                # Get list of contributions for this user (revid and pageid)
+                contributions = get_user_contributions(username=starter_value,
+                                                       sequence_fetch_method=sequence_fetch_method[layer_level],
+                                                       sequencing_function=sequencing_function[layer_level],
+                                                       max_elements_per_sequence=max_elements_per_sequence[layer_level])
+
+                print contributions
+                rev_dict = {}
+                # For each contribution get the revision details
+                for c, v in enumerate(contributions):
+                    revid = v.get('revid')
+                    pageid = v.get('pageid')
+                    cont_features = self.get_main_features_for_revision(revid=revid, pageid=pageid)
+                    pageid = v.get('pageid')
+                    page_vector = self.get_revisions_for_model(condition_list=condition_list,
+                                                               depth=depth,
+                                                               layer_level=layer_level + 1,
+                                                               feature_vector=feature_vector,
+                                                               max_elements_per_sequence=max_elements_per_sequence,
+                                                               sequence_fetch_method=sequence_fetch_method,
+                                                               sequencing_function=sequencing_function,
+                                                               module_type=module_type,
+                                                               item_val=item_val,
+                                                               starter_value=pageid)
+
+                    rev_dict[revid] = dict(features=cont_features,
+                                           pageid=pageid,
+                                           page_vector=page_vector)
+
+                return rev_dict
+
+            elif condition_list[layer_level] == 'page':
+                print condition_list[layer_level]
+
+                rev_list = get_revisions_on_page(pageid=starter_value,
+                                                 sequence_fetch_method=sequence_fetch_method[layer_level],
+                                                 sequencing_function=sequencing_function[layer_level],
+                                                 max_elements_per_sequence=max_elements_per_sequence[layer_level])
+
+                rev_dict = {}
+                # For each contribution get the revision details
+                for c, v in enumerate(rev_list):
+                    revid = v.get('revid')
+                    pageid = starter_value
+                    cont_features = self.get_main_features_for_revision(revid=revid, pageid=pageid)
+                    username = v.get('user')
+                    user_vector = self.get_revisions_for_model(condition_list=condition_list,
+                                                               depth=depth,
+                                                               layer_level=layer_level + 1,
+                                                               feature_vector=feature_vector,
+                                                               max_elements_per_sequence=max_elements_per_sequence,
+                                                               sequence_fetch_method=sequence_fetch_method,
+                                                               sequencing_function=sequencing_function,
+                                                               module_type=module_type,
+                                                               item_val=item_val,
+                                                               starter_value=username)
+
+                    rev_dict[revid] = dict(features=cont_features,
+                                           username=username,
+                                           user_vector=user_vector)
+
+                return rev_dict
+            else:
+                print condition_list[layer_level]
+                print "Type not identified"
+        else:
+            return None
+
+    def get_main_features_for_revision(self, revid, pageid):
+        """
+        Get the basic set of features for a revision.
+        At this stage, the features can be left un-normalized.
+
+        :param revid:
+        :type revid:
+        :param pageid:
+        :type pageid:
+        :return:
+        :rtype:
+        """
+
+        # Search for revision in DB
+        revision = self.db(self.revisions2.revid == revid).select().first()
+
+        # If exists then simply return that
+        if revision is not None:
+            return revision.as_dict()
+
+        # Get revision info from Wikipedia
+        revision = self.wiki.fetch_revisions_for_page(pageid=pageid,
+                                                      start_rev=revid,
+                                                      chunk_size=1)
+        print "revision: %r"%(revision)
+        if len(revision):
+            revision = revision[0]
+        else:
+            return None
+
+        # Wikipedia PageID of the revision under consideration
+        revision_info = dict(pageid=pageid, revid=revid)
+        username = revision.get('user')
+        # curr is this revision
+        # prev is previous revision by another author
+        # following is list of next (upto 10) revisions by different authors
+        curr, prev, following = _operate_on_contributions(revision_info, username=username)
+
+        # Some checks since web data can often lead to unknown errors. (eg 500 from Wikipedia server)
+        # Current revision and previous revision by another author on page are
+        # important for quality measurements. So make sure they exist
+        if not curr or not prev:
+            completed = False
+            return None
+
+        # Get individual entry from list curr
+        curr = curr[0]
+
+        # Basic features of current revision
+        t_curr = datetime.strptime(curr.get('timestamp'), DATE_PATTERN)
+        content_curr = curr.get('*', '')
+        parent_curr = curr.get('parentid', None)
+
+        # Get parent revision of current using parentID
+        # Features of parent revision are required in order to
+        # measure distance and char update values of this revision
+        parent_rev = self.wiki.fetch_revisions_for_page(pageid=pageid,
+                                                        start_rev=parent_curr,
+                                                        chunk_size=1, )
+        # Do not use the revision if parent_rev can't be fetched.
+        if not parent_rev:
+            completed = False
+            return None
+
+        # Basic features of parent revision
+        parent_rev = parent_rev[0]
+        content_parent = parent_rev.get('*', '')
+        t_prev_page = datetime.strptime(parent_rev.get('timestamp'), DATE_PATTERN)
+
+        # Get next revision on page for future time feature
+        # The call will include current revision also
+        next_rev = self.wiki.fetch_revisions_for_page(pageid=pageid,
+                                                      start_rev=curr['revid'],
+                                                      chunk_size=2,
+                                                      direction="newer", )
+
+        # Check if next revision was retrieved or not
+        # If not then do not continue with this
+        if len(next_rev) < 2:
+            completed = False
+            return None
+
+        # To get time feature from next revision on this page
+        next_rev = next_rev[1]
+        t_next_page = datetime.strptime(next_rev.get('timestamp'), DATE_PATTERN)
+
+        # Get distances from parent revision
+        # Here we get character features by comparing current revision with parent revision
+        feature_dict = _get_distances(content_curr, content_parent)
+        feature_dict['current_rev_length'] = len(content_curr)
+        feature_dict['parent_rev_length'] = len(content_parent)
+
+        # Now add action features to this set of character features
+        feature_dict['rev_comment_length'] = len(curr.get('comment', ''))
+        feature_dict['time_in_day'] = t_curr.hour
+        feature_dict['day_of_week'] = t_curr.weekday()
+
+        # Getting time features now by using current, previous and next tinmes.
+
+        # Time from previous revision on page
+        feature_dict['time_prev_page'] = (t_curr - t_prev_page).total_seconds()
+
+        # Time to next on page
+        feature_dict['time_next_page'] = (t_next_page - t_curr).total_seconds()
+
+        # Time from previous revision by user
+        # The call will include current revision also
+        contribution_before = self.wiki.get_user_contributions(username=username,
+                                                               cont_limit=2,
+                                                               start_time=curr.get('timestamp'),
+                                                               direction="older")
+
+        t_user_prev = datetime.strptime(contribution_before[1].get('timestamp'), DATE_PATTERN) if len(
+            contribution_before) > 1 else 0
+
+        feature_dict['time_prev_user'] = (t_curr - t_user_prev).total_seconds() if t_user_prev else 0.0
+
+        # Time from previous revision by user on this page
+        t_user_page_prev = _get_previous_by_user_on_page(username=username,
+                                                         page=pageid,
+                                                         revision=curr.get('revid', None))
+
+        feature_dict['time_prev_user_page'] = (
+            t_curr - t_user_page_prev).total_seconds() if t_user_page_prev else 0.0
+
+        # Fill in remaining entries of revision dict
+        # to be placed in the DB. These include values from
+        # result dict obtained by calling Wikimedia API
+        feature_dict['revid'] = curr.get('revid')
+        feature_dict['pageid'] = pageid
+        feature_dict['parentid'] = parent_curr
+        feature_dict['username'] = username
+        feature_dict['rev_timestamp'] = t_curr  # To get it as datetime type
+        feature_dict['userid'] = curr['userid']
+        feature_dict['rev_content'] = content_curr
+        feature_dict['rev_comment'] = curr.get('comment', '')
+        feature_dict['rev_size'] = curr['size']
+
+        # Now we need to calculate the quality of this revision by
+        # using a revision prior to it from a different author and
+        # using next 10 revisions by different authors
+        # Measure quality for current revision
+        feature_dict['q4'] = _measure_revision_quality(curr=curr, prev=prev, foll=following, next_count=4)
+        feature_dict['q6'] = _measure_revision_quality(curr=curr, prev=prev, foll=following, next_count=6)
+        feature_dict['q10'] = _measure_revision_quality(curr=curr, prev=prev, foll=following, next_count=10)
+
+        # Can print and look at the dict if needed
+        # print("===== DICT printing====")
+        # pprint(feature_dict)
+        # print("===== DICT printed====")
+
+        # Push revision into the DB
+
+        insert_return = self.revisions2.update_or_insert(self.revisions2.revid == curr.get('revid'),
+                                                         **feature_dict)
+        # Commit at this point to ensure it stays in DB even if something else crashes
+        self.db.commit()
+
+        return feature_dict
 
 
 if __name__ == "__main__":
@@ -1030,4 +1353,10 @@ if __name__ == "__main__":
 
     # Get missing data per entry. Then improve rest
 
-    db.load_fresh_from_db()
+    #db.load_fresh_from_db()
+    output = db.generate_deep_data(depth=2,initial_limiter=3)
+
+    pprint(output)
+
+
+

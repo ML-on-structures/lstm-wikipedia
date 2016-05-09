@@ -475,6 +475,34 @@ class DataAccess:
 
         self.db.commit()
 
+        self.ug_db = DAL('sqlite://graph_storage.sqlite', folder="data")
+
+        self.graph_edge = self.ug_db.define_table('graph_edge',
+                                                  Field('PageId'),
+                                                  Field('timestamp'),
+                                                  Field('uid0'),
+                                                  Field('uid1'),
+                                                  Field('uid2'),
+                                                  Field('uname0'),
+                                                  Field('uname1'),
+                                                  Field('uname2'),
+                                                  Field('d01', 'double'),
+                                                  Field('d12', 'double'),
+                                                  Field('d02', 'double'),
+                                                  Field('n01'),
+                                                  Field('n12'),
+                                                  Field('t01', 'double'),
+                                                  Field('t12', 'double'),
+                                                  Field('rev0'),
+                                                  Field('rev1'),
+                                                  Field('rev2'),
+                                                  Field('dp2', 'double'),
+                                                  Field('Delta', 'double'),
+                                                  migrate=False
+                                                  )
+
+        self.ug_db.commit()
+
         self.wiki = WikiFetch()
 
     def _get_main_normalization_values(self):
@@ -970,7 +998,7 @@ class DataAccess:
                            module_type=None,
                            store=True,
                            json_base_file_name="deep_data",
-                           initial_limiter = None
+                           initial_limiter=None
                            ):
         """
 
@@ -1080,16 +1108,16 @@ class DataAccess:
 
         for user in users[:initial_limiter]:
             v = self.get_revisions_for_model(condition_list=condition_list,
-                                         depth=depth,
-                                         layer_level=layer_level,
-                                         feature_vector=feature_vector,
-                                         max_elements_per_sequence=max_elements_per_sequence,
-                                         sequence_fetch_method=sequence_fetch_method,
-                                         sequencing_function=sequencing_function,
-                                         module_type=None,
-                                         item_val='',
-                                         starter_value=user['username']
-                                         )
+                                             depth=depth,
+                                             layer_level=layer_level,
+                                             feature_vector=feature_vector,
+                                             max_elements_per_sequence=max_elements_per_sequence,
+                                             sequence_fetch_method=sequence_fetch_method,
+                                             sequencing_function=sequencing_function,
+                                             module_type=None,
+                                             item_val='',
+                                             starter_value=user['username']
+                                             )
 
             ret_dict[user['username']] = v
         return ret_dict
@@ -1194,7 +1222,7 @@ class DataAccess:
         revision = self.wiki.fetch_revisions_for_page(pageid=pageid,
                                                       start_rev=revid,
                                                       chunk_size=1)
-        print "revision: %r"%(revision)
+        print "revision: %r" % (revision)
         if len(revision):
             revision = revision[0]
         else:
@@ -1353,10 +1381,7 @@ if __name__ == "__main__":
 
     # Get missing data per entry. Then improve rest
 
-    #db.load_fresh_from_db()
-    output = db.generate_deep_data(depth=2,initial_limiter=3)
+    # db.load_fresh_from_db()
+    output = db.generate_deep_data(depth=2, initial_limiter=3)
 
     pprint(output)
-
-
-

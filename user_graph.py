@@ -1,16 +1,21 @@
+import json
 import os
 import gzip
+import random
 from pprint import pprint
 
+from datetime import datetime
 import numpy as np
-import parse
 
 ##############
 ## Test Mode
 import re
 
-user_graph = {}
+from db import DataAccess
 
+user_graph = {}
+global NONECTR
+NONECTR = 0
 
 def add_to_graph(file_content):
     """
@@ -46,28 +51,53 @@ def add_to_graph(file_content):
     :return:
     :rtype:
     """
-    print "User Graph now"
-    pprint(user_graph)
-    print "\n-------------\n"
+    # print "User Graph now"
+    # pprint(user_graph)
+    # print "\n-------------\n"
+    global NONECTR
+    db = DataAccess()
     lines = file_content.splitlines()
     for line in lines:
-        pattern = "EditInc (?P<time>\d+) PageId: (?P<pageid>\d+) Delta: (?P<delta_char>\d+).(?P<delta_mant>\d+) rev0: (?P<rev0>\d+) uid0: (?P<uid0>\d+) uname0: (?P<uname0>\S+) rev1: (?P<rev1>\d+) uid1: (?P<uid1>\d+) uname1: (?P<uname1>\S+) rev2: (?P<rev2>\d+) uid2: (?P<uid2>\d+) uname2: (?P<uname2>\S+) d01: (?P<d01_char>\d+).(?P<d01_mant>\d+) d02: (?P<d02_char>\d+).(?P<d02_mant>\d+) d12: (?P<d12_char>\d+).(?P<d12_mant>\d+) dp2: (?P<dp2_char>\d+).(?P<dp2_mant>\d+) n01: (?P<n01>\d+) n12: (?P<n12>\d+) t01: (?P<t01_char>\d+).(?P<t01_mant>\d+) t12: (?P<t12_char>\d+).(?P<t12_mant>\d+)"
-        m = re.match(pattern=pattern, string=line)
-        if m is not None:
+        # pattern = "EditInc (?P<time>\d+) PageId: (?P<pageid>\d+) Delta: (?P<delta_char>\d+).(?P<delta_mant>\d+) rev0: (?P<rev0>\d+) uid0: (?P<uid0>\d+) uname0: (?P<uname0>\S+) rev1: (?P<rev1>\d+) uid1: (?P<uid1>\d+) uname1: (?P<uname1>\S+) rev2: (?P<rev2>\d+) uid2: (?P<uid2>\d+) uname2: (?P<uname2>\S+) d01: (?P<d01_char>\d+).(?P<d01_mant>\d+) d02: (?P<d02_char>\d+).(?P<d02_mant>\d+) d12: (?P<d12_char>\d+).(?P<d12_mant>\d+) dp2: (?P<dp2_char>\d+).(?P<dp2_mant>\d+) n01: (?P<n01>\d+) n12: (?P<n12>\d+) t01: (?P<t01_char>\d+).(?P<t01_mant>\d+) t12: (?P<t12_char>\d+).(?P<t12_mant>\d+)"
+        #
+        # pattern = """EditInc(\s*)(?P<time>\d+)(\s*)PageId:(\s*)(?P<pageid>\d+)(\s*)Delta:(\s*)(?P<delta_char>\d+).(?P<delta_mant>\d+)(\s*)rev0:(\s*)(?P<rev0>\d+)(\s*)uid0:(\s*)(?P<uid0>\d+)(\s*)uname0:(\s*)"(?P<uname0>\S+)"(\s*)rev1:(\s*)(?P<rev1>\d+)(\s*)uid1:(\s*)(?P<uid1>\d+)(\s*)uname1:(\s*)"(?P<uname1>\S+)"(\s*)rev2:(\s*)(?P<rev2>\d+)(\s*)uid2:(\s*)(?P<uid2>\d+)(\s*)uname2:(\s*)"(?P<uname2>\S+)"(\s*)d01:(\s*)(?P<d01_char>\d+).(?P<d01_mant>\d+)(\s*)d02:(\s*)(?P<d02_char>\d+).(?P<d02_mant>\d+)(\s*)d12:(\s*)(?P<d12_char>\d+).(?P<d12_mant>\d+)(\s*)dp2:(\s*)(?P<dp2_char>\d+).(?P<dp2_mant>\d+)(\s*)n01:(\s*)(?P<n01>\d+)(\s*)n12:(\s*)(?P<n12>\d+)(\s*)t01:(\s*)(?P<t01_char>\d+).(?P<t01_mant>\d+)(\s*)t12:(\s*)(?P<t12_char>\d+).(?P<t12_mant>\d+)"""
+        # m = re.search(pattern=pattern, string=line)
+        #
+
+        line_broken = line.split('|')
+        if line_broken[0]=="EditInc":
+            line_dict = {i.split(':')[0]:i.split(':')[1] for i in line_broken[2:]}
+            line_dict['timestamp'] = line_broken[1]
+
+            # # Add entry to DB
+            # db.graph_edge.insert(**line_dict)
+            # db.ug_db.commit()
+
+            keys_to_remove =['uid0','uid1','uid2','rev0','rev1','rev2','uname1','uname2']
+
+            node_dict = line_dict.copy()
+            for key in keys_to_remove:
+                node_dict.pop(key)
+
+            u0 = line_dict['uname0']
+            u1 = line_dict['uname1']
+            u2 = line_dict['uname2']
+
+            if not user_graph.has_key(u1):
+                user_graph[u1] = {}
+
+            if not user_graph[u1].has_key(u2):
+                user_graph[u1][u2] = []
+
+            user_graph[u1][u2].append(node_dict)
+
+        else:
+            # print "Reached into None"
             # print line
-            # pprint(m.groupdict())
-            vals = m.groupdict()
-            k = vals['uname0']
-            if user_graph.has_key(k):
-                if user_graph[k].has_key(vals['uname1']):
-                    user_graph[k][vals['uname1']].append({})
-                else:
-                    user_graph[k][vals['uname1']] = []
-                    user_graph[k][vals['uname1']].append({})
-            else:
-                user_graph[k] = {}
-                user_graph[k][vals['uname1']] = []
-                user_graph[k][vals['uname1']].append({})
+            # print "\n\n"
+            if "EditInc" in line:
+                print line
+            NONECTR+=1
 
 
 def get_files(base_dir):
@@ -163,4 +193,15 @@ if __name__ == "__main__":
 
     get_files(base_dir)
 
-    pprint(user_graph)
+    user_graph_file = os.path.join(os.getcwd(), 'results', 'user_graph.json')
+
+
+    with open(user_graph_file, 'wb+') as output:
+        json.dump(user_graph,output)
+    # pprint(user_graph)
+    print "Users in graph", len(user_graph.keys())
+    print "None counter", NONECTR
+
+    for i in random.sample(user_graph.keys(),10):
+        pprint(user_graph[i])
+        print "--------"

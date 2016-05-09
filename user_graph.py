@@ -13,11 +13,11 @@ import re
 
 from db import DataAccess
 
-user_graph = {}
+# user_graph = {}
 global NONECTR
 NONECTR = 0
 
-def add_to_graph(file_content):
+def add_to_graph(file_content, user_graph):
     """
 
     From WikiTrust:
@@ -57,6 +57,7 @@ def add_to_graph(file_content):
     global NONECTR
     db = DataAccess()
     lines = file_content.splitlines()
+
     for line in lines:
         # pattern = "EditInc (?P<time>\d+) PageId: (?P<pageid>\d+) Delta: (?P<delta_char>\d+).(?P<delta_mant>\d+) rev0: (?P<rev0>\d+) uid0: (?P<uid0>\d+) uname0: (?P<uname0>\S+) rev1: (?P<rev1>\d+) uid1: (?P<uid1>\d+) uname1: (?P<uname1>\S+) rev2: (?P<rev2>\d+) uid2: (?P<uid2>\d+) uname2: (?P<uname2>\S+) d01: (?P<d01_char>\d+).(?P<d01_mant>\d+) d02: (?P<d02_char>\d+).(?P<d02_mant>\d+) d12: (?P<d12_char>\d+).(?P<d12_mant>\d+) dp2: (?P<dp2_char>\d+).(?P<dp2_mant>\d+) n01: (?P<n01>\d+) n12: (?P<n12>\d+) t01: (?P<t01_char>\d+).(?P<t01_mant>\d+) t12: (?P<t12_char>\d+).(?P<t12_mant>\d+)"
         #
@@ -69,9 +70,9 @@ def add_to_graph(file_content):
             line_dict = {i.split(':')[0]:i.split(':')[1] for i in line_broken[2:]}
             line_dict['timestamp'] = line_broken[1]
 
-            # # Add entry to DB
-            # db.graph_edge.insert(**line_dict)
-            # db.ug_db.commit()
+            # Add entry to DB
+            db.graph_edge.insert(**line_dict)
+            db.ug_db.commit()
 
             keys_to_remove =['uid0','uid1','uid2','rev0','rev1','rev2','uname1','uname2']
 
@@ -109,6 +110,7 @@ def get_files(base_dir):
     :return:
     :rtype:
     """
+
 
     for root, dirs, files in os.walk(base_dir):
         for dir in dirs:
@@ -188,13 +190,36 @@ def build_graph():
     """
 
 
+def get_split_files(base_dir, user_graph):
+    """
+    Get all the files in nested directories under base_dir
+
+    :param base_dir: Absolute path of the base directory
+    :type base_dir: str
+    :return:
+    :rtype:
+    """
+
+    for root, dirs, files in os.walk(base_dir):
+        for file in files:
+            with gzip.open(os.path.join(root, file), 'rb') as input:
+                file_content = input.read()
+                add_to_graph(file_content, user_graph)
+
+
 if __name__ == "__main__":
-    base_dir = "/home/rakshit/Research/ML/wikipedia_lstm/data/wikitrust"
+    base_dir = "/home/rakshit/Research/ML/wikipedia_lstm/data/wikitrust/001"
 
-    get_files(base_dir)
+    user_graph_file = os.path.join(os.getcwd(), 'results', 'user_graph_test.json')
 
-    user_graph_file = os.path.join(os.getcwd(), 'results', 'user_graph.json')
+    if os.path.isfile(user_graph_file):
+        with open(user_graph_file, 'rb+') as inp:
+            user_graph = json.load(inp)
+    else:
+        user_graph = {}
+    # get_files(base_dir)
 
+    get_split_files(base_dir, user_graph)
 
     with open(user_graph_file, 'wb+') as output:
         json.dump(user_graph,output)

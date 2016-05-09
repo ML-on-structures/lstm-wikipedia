@@ -498,7 +498,7 @@ class DataAccess:
                                                   Field('rev2'),
                                                   Field('dp2', 'double'),
                                                   Field('Delta', 'double'),
-                                                  migrate=False
+                                                  migrate=True
                                                   )
 
         self.ug_db.commit()

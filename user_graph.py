@@ -17,7 +17,7 @@ from db import DataAccess
 global NONECTR
 NONECTR = 0
 
-def add_to_graph(file_content, user_graph, user_contribs):
+def add_to_graph(file_content):#, user_graph, user_contribs):
     """
 
     From WikiTrust:
@@ -55,7 +55,7 @@ def add_to_graph(file_content, user_graph, user_contribs):
     # pprint(user_graph)
     # print "\n-------------\n"
     global NONECTR
-    # db = DataAccess()
+    db = DataAccess()
     lines = file_content.splitlines()
 
     for line in lines:
@@ -70,34 +70,37 @@ def add_to_graph(file_content, user_graph, user_contribs):
             line_dict = {i.split(':')[0]:i.split(':')[1] for i in line_broken[2:]}
             line_dict['timestamp'] = line_broken[1]
 
-            # # Add entry to DB
-            # db.graph_edge.insert(**line_dict)
-            # db.ug_db.commit()
+            # Add entry to DB
+            entry_id = db.graph_edge.insert(**line_dict)
+            db.ug_db.commit()
 
-            keys_to_remove =['uid0','uid1','uid2','rev0','rev1','rev2','uname1','uname2']
+            if np.random.randn()>0.99:
+                print "Entry ID for DB: %r"%(entry_id)
 
-            node_dict = line_dict.copy()
-            for key in keys_to_remove:
-                node_dict.pop(key)
-
-            u0 = line_dict['uname0']
-            u1 = line_dict['uname1']
-            u2 = line_dict['uname2']
-
-            if not user_graph.has_key(u1):
-                user_graph[u1] = {}
-
-            if not user_graph[u1].has_key(u2):
-                user_graph[u1][u2] = []
-
-            user_graph[u1][u2].append(node_dict)
-
-            # User contribution record
-
-            if not user_contribs.has_key(u1):
-                user_contribs[u1] = []
-
-            user_contribs[u1].append(line_dict)
+            # keys_to_remove =['uid0','uid1','uid2','rev0','rev1','rev2','uname1','uname2']
+            #
+            # node_dict = line_dict.copy()
+            # for key in keys_to_remove:
+            #     node_dict.pop(key)
+            #
+            # u0 = line_dict['uname0']
+            # u1 = line_dict['uname1']
+            # u2 = line_dict['uname2']
+            #
+            # if not user_graph.has_key(u1):
+            #     user_graph[u1] = {}
+            #
+            # if not user_graph[u1].has_key(u2):
+            #     user_graph[u1][u2] = []
+            #
+            # user_graph[u1][u2].append(node_dict)
+            #
+            # # User contribution record
+            #
+            # if not user_contribs.has_key(u1):
+            #     user_contribs[u1] = []
+            #
+            # user_contribs[u1].append(line_dict)
 
 
         else:
@@ -109,7 +112,7 @@ def add_to_graph(file_content, user_graph, user_contribs):
             NONECTR+=1
 
 
-def get_files(base_dir, user_graph, user_contribs):
+def get_files(base_dir):#, user_graph, user_contribs):
     """
     Get all the files in nested directories under base_dir
 
@@ -126,7 +129,7 @@ def get_files(base_dir, user_graph, user_contribs):
                 for file in f2:
                     with gzip.open(os.path.join(r2, file), 'rb') as input:
                         file_content = input.read()
-                        add_to_graph(file_content, user_graph, user_contribs)
+                        add_to_graph(file_content)
 
 
 def build_graph():
@@ -198,7 +201,7 @@ def build_graph():
     """
 
 
-def get_split_files(base_dir, user_graph):
+def get_split_files(base_dir):#, user_graph):
     """
     Get all the files in nested directories under base_dir
 
@@ -212,42 +215,42 @@ def get_split_files(base_dir, user_graph):
         for file in files:
             with gzip.open(os.path.join(root, file), 'rb') as input:
                 file_content = input.read()
-                add_to_graph(file_content, user_graph)
+                add_to_graph(file_content)
 
 
 if __name__ == "__main__":
-    base_dir = "/home/rakshit/Research/ML/wikipedia_lstm/data/rmywiki_pipe"
+    base_dir = "/home/rakshit/Research/ML/wikipedia_lstm/data/rmywiki_pipe/stats/000"
 
-    user_graph_file = os.path.join(os.getcwd(), 'results', 'user_graph_test.json')
+    # user_graph_file = os.path.join(os.getcwd(), 'results', 'user_graph_test.json')
+    #
+    # if os.path.isfile(user_graph_file):
+    #     with open(user_graph_file, 'rb+') as inp:
+    #         user_graph = json.load(inp)
+    # else:
+    #     user_graph = {}
+    #
+    # user_contrib_file = os.path.join(os.getcwd(), 'results', 'user_contrib_test.json')
+    #
+    # if os.path.isfile(user_contrib_file):
+    #     with open(user_contrib_file, 'rb+') as inp:
+    #         user_contribs = json.load(inp)
+    # else:
+    #     user_contribs = {}
 
-    if os.path.isfile(user_graph_file):
-        with open(user_graph_file, 'rb+') as inp:
-            user_graph = json.load(inp)
-    else:
-        user_graph = {}
+    # get_files(base_dir, user_graph, user_contribs)
 
-    user_contrib_file = os.path.join(os.getcwd(), 'results', 'user_contrib_test.json')
+    get_split_files(base_dir)
 
-    if os.path.isfile(user_contrib_file):
-        with open(user_contrib_file, 'rb+') as inp:
-            user_contribs = json.load(inp)
-    else:
-        user_contribs = {}
-
-    get_files(base_dir, user_graph, user_contribs)
-
-    # get_split_files(base_dir, user_graph)
-
-    with open(user_graph_file, 'wb+') as output:
-        json.dump(user_graph, output)
-
-    with open(user_contrib_file, 'wb+') as output:
-        json.dump(user_contribs, output)
-
-    # pprint(user_graph)
-    print "Users in graph", len(user_graph.keys())
+    # with open(user_graph_file, 'wb+') as output:
+    #     json.dump(user_graph, output)
+    #
+    # with open(user_contrib_file, 'wb+') as output:
+    #     json.dump(user_contribs, output)
+    #
+    # # pprint(user_graph)
+    # print "Users in graph", len(user_graph.keys())
     print "None counter", NONECTR
 
-    for i in random.sample(user_graph.keys(),10):
-        pprint(user_graph[i])
-        print "--------"
+    # for i in random.sample(user_graph.keys(),10):
+    #     pprint(user_graph[i])
+    #     print "--------"

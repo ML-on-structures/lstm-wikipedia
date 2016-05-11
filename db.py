@@ -475,7 +475,7 @@ class DataAccess:
 
         self.db.commit()
 
-        self.ug_db = DAL('sqlite://graph_storage.sqlite', folder="data")
+        self.ug_db = DAL('sqlite://graph_storage2.sqlite', folder="data")
 
         self.graph_edge = self.ug_db.define_table('graph_edge',
                                                   Field('PageId'),

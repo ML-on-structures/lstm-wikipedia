@@ -2,8 +2,9 @@ import json
 import os
 import gzip
 import random
+import uuid
 from pprint import pprint
-
+from json_plus import Serializable
 from datetime import datetime
 import numpy as np
 
@@ -13,11 +14,15 @@ import re
 
 from db import DataAccess
 
+WIKINAME = 'rmywiki'
+USER_INDEX = os.path.join(os.getcwd(),'results',WIKINAME,'user_index.json')
+
 # user_graph = {}
 global NONECTR
 NONECTR = 0
 
-def add_to_graph(file_content):#, user_graph, user_contribs):
+
+def add_to_graph(file_content):  # , user_graph, user_contribs):
     """
 
     From WikiTrust:
@@ -66,41 +71,41 @@ def add_to_graph(file_content):#, user_graph, user_contribs):
         #
 
         line_broken = line.split('|')
-        if line_broken[0]=="EditInc":
-            line_dict = {i.split(':')[0]:i.split(':')[1] for i in line_broken[2:]}
+        if line_broken[0] == "EditInc":
+            line_dict = {i.split(':')[0]: i.split(':')[1] for i in line_broken[2:]}
             line_dict['timestamp'] = line_broken[1]
 
             # Add entry to DB
             entry_id = db.graph_edge.insert(**line_dict)
             db.ug_db.commit()
 
-            if np.random.randn()>0.99:
-                print "Entry ID for DB: %r"%(entry_id)
+            if np.random.randn() > 0.99:
+                print "Entry ID for DB: %r" % (entry_id)
 
-            # keys_to_remove =['uid0','uid1','uid2','rev0','rev1','rev2','uname1','uname2']
-            #
-            # node_dict = line_dict.copy()
-            # for key in keys_to_remove:
-            #     node_dict.pop(key)
-            #
-            # u0 = line_dict['uname0']
-            # u1 = line_dict['uname1']
-            # u2 = line_dict['uname2']
-            #
-            # if not user_graph.has_key(u1):
-            #     user_graph[u1] = {}
-            #
-            # if not user_graph[u1].has_key(u2):
-            #     user_graph[u1][u2] = []
-            #
-            # user_graph[u1][u2].append(node_dict)
-            #
-            # # User contribution record
-            #
-            # if not user_contribs.has_key(u1):
-            #     user_contribs[u1] = []
-            #
-            # user_contribs[u1].append(line_dict)
+                # keys_to_remove =['uid0','uid1','uid2','rev0','rev1','rev2','uname1','uname2']
+                #
+                # node_dict = line_dict.copy()
+                # for key in keys_to_remove:
+                #     node_dict.pop(key)
+                #
+                # u0 = line_dict['uname0']
+                # u1 = line_dict['uname1']
+                # u2 = line_dict['uname2']
+                #
+                # if not user_graph.has_key(u1):
+                #     user_graph[u1] = {}
+                #
+                # if not user_graph[u1].has_key(u2):
+                #     user_graph[u1][u2] = []
+                #
+                # user_graph[u1][u2].append(node_dict)
+                #
+                # # User contribution record
+                #
+                # if not user_contribs.has_key(u1):
+                #     user_contribs[u1] = []
+                #
+                # user_contribs[u1].append(line_dict)
 
 
         else:
@@ -109,10 +114,127 @@ def add_to_graph(file_content):#, user_graph, user_contribs):
             # print "\n\n"
             if "EditInc" in line:
                 print line
-            NONECTR+=1
+            NONECTR += 1
 
 
-def get_files(base_dir):#, user_graph, user_contribs):
+def _get_index_entry(user):
+
+    if os.path.isfile(USER_INDEX):
+        with open(USER_INDEX, 'rb') as inp:
+            index_of_users = json.load(inp)
+    else:
+        index_of_users = {}
+
+    return index_of_users.get(user,_set_into_index(user))
+
+def _set_into_index(user):
+
+    if os.path.isfile(USER_INDEX):
+        with open(USER_INDEX,'rb') as inp:
+            index_of_users = json.load(inp)
+    else:
+        index_of_users = {}
+
+    index_of_users[user] = str(uuid.uuid5(uuid.NAMESPACE_OID, user))
+
+    with open(USER_INDEX,'wb') as outp:
+        json.dump(index_of_users,outp)
+
+    return index_of_users.get(user)
+
+
+def _get_file_name(user, suffix = 'dict'):
+
+    index_entry_for_user = _get_index_entry(user)
+
+    user_file = "%s_%s.json" % (index_entry_for_user, suffix)
+    return os.path.join(os.getcwd(),'results', WIKINAME, user_file)
+
+
+def _get_dict_for_user(user):
+    """
+    Get the file containing revision entries for the user "user"
+    If the file is present, load its json which is effectively a dict
+
+    Otherwise create the file
+    :param user:
+    :type user:
+    :return:
+    :rtype:
+    """
+    filename = _get_file_name(user)
+    if os.path.isfile(filename):
+        with open(filename, 'rb') as inp:
+            user_dict = Serializable.loads(json.load(inp))
+    else:
+        user_dict = {user:{}}
+
+    return user_dict[user]
+
+
+def _update_dict_for_user(user, dict_for_user):
+    """
+    Write the dict into user's specific file
+    :param user:
+    :type user:
+    :return:
+    :rtype:
+    """
+    dict_to_dump = {user:dict_for_user}
+
+    filename = _get_file_name(user)
+    with open(filename, 'wb') as outp:
+        json.dump(Serializable.dumps(dict_to_dump), outp)
+
+
+def _update_edge(user, rev, full_dict):
+    """
+    Update the dictionary for user witha list to the revisions rev.
+    The full dict consists of an item which needs to be added to the list of
+    work done on tope of rev.
+
+    :param user:
+    :type user:
+    :param rev:
+    :type rev:
+    :param full_dict:
+    :type full_dict:
+    :return:
+    :rtype:
+    """
+
+    user_dict = _get_dict_for_user(user)
+
+    rev_key = (rev, full_dict['timestamp'] -full_dict['t12'])
+
+    if not user_dict.has_key(rev_key):
+        user_dict[rev_key] = []
+
+    user_dict[rev_key].append(full_dict)
+
+    _update_dict_for_user(user, user_dict)
+
+
+def add_graph_content(file_content):
+    """
+
+    :param file_content:
+    :type file_content:
+    :return:
+    :rtype:
+    """
+    lines = file_content.splitlines()
+    for line in lines:
+        line_broken = line.split('|')
+        if line_broken[0] == "EditInc":
+            line_dict = {i.split(':')[0]: i.split(':')[1] for i in line_broken[2:]}
+            line_dict['timestamp'] = line_broken[1]
+
+            # This entry in line_dict represents judgement of uname1's rev1 revision by uname2 using rev2
+            _update_edge(user=line_dict['uname1'], rev=line_dict['rev1'], full_dict=line_dict)
+
+
+def get_files(base_dir):  # , user_graph, user_contribs):
     """
     Get all the files in nested directories under base_dir
 
@@ -122,14 +244,14 @@ def get_files(base_dir):#, user_graph, user_contribs):
     :rtype:
     """
 
-
     for root, dirs, files in os.walk(base_dir):
         for dir in dirs:
             for r2, d2, f2 in os.walk(os.path.join(root, dir)):
                 for file in f2:
                     with gzip.open(os.path.join(r2, file), 'rb') as input:
                         file_content = input.read()
-                        add_to_graph(file_content)
+                        # add_to_graph(file_content)
+                        add_graph_content(file_content=file_content)
 
 
 def build_graph():
@@ -201,7 +323,7 @@ def build_graph():
     """
 
 
-def get_split_files(base_dir):#, user_graph):
+def get_split_files(base_dir):  # , user_graph):
     """
     Get all the files in nested directories under base_dir
 
@@ -219,7 +341,12 @@ def get_split_files(base_dir):#, user_graph):
 
 
 if __name__ == "__main__":
-    base_dir = "/home/rakshit/Research/ML/wikipedia_lstm/data/rmywiki_pipe/stats/000"
+    base_dir = "/home/rakshit/Research/ML/wikipedia_lstm/data/%s_pipe/stats/" % (WIKINAME)
+    print base_dir
+    print os.path.isdir(base_dir)
+
+    if not os.path.isdir(os.path.join(os.getcwd(),'results',WIKINAME)):
+        os.mkdir(os.path.join(os.getcwd(),'results',WIKINAME))
 
     # user_graph_file = os.path.join(os.getcwd(), 'results', 'user_graph_test.json')
     #
@@ -239,7 +366,8 @@ if __name__ == "__main__":
 
     # get_files(base_dir, user_graph, user_contribs)
 
-    get_split_files(base_dir)
+    # get_split_files(base_dir)
+    get_files(base_dir)
 
     # with open(user_graph_file, 'wb+') as output:
     #     json.dump(user_graph, output)

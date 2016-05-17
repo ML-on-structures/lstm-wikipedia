@@ -404,7 +404,7 @@ def get_user_dict(base_dir):
 
 
 if __name__ == "__main__":
-    base_dir = "/home/rakshit/Research/ML/wikipedia_lstm/data/%s_pipe/stats/" % (WIKINAME)
+    base_dir = os.path.join(os.getcwd(),'data','%s_pipe/stats/' % (WIKINAME))
     print base_dir
     print os.path.isdir(base_dir)
 

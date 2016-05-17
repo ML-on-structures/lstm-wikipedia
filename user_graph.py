@@ -17,6 +17,7 @@ from db import DataAccess
 WIKINAME = 'rmywiki'
 USER_INDEX = os.path.join(os.getcwd(), 'results', WIKINAME, 'user_index.json')
 
+FILE_MODE = True
 # user_graph = {}
 global NONECTR
 NONECTR = 0
@@ -160,12 +161,22 @@ def _get_dict_for_user(user):
     :return:
     :rtype:
     """
-    filename = _get_file_name(user)
-    if os.path.isfile(filename):
+    if FILE_MODE:
+        filename = _get_file_name(user)
+        if os.path.isfile(filename):
+            with open(filename, 'rb') as inp:
+                user_dict = Serializable.loads(json.load(inp))
+        else:
+            user_dict = {user: {}}
+
+
+    else:
+        filename = os.path.join(os.getcwd(),'results',WIKINAME,'user_graph.json')
         with open(filename, 'rb') as inp:
             user_dict = Serializable.loads(json.load(inp))
-    else:
-        user_dict = {user: {}}
+
+        if not user_dict.has_key(user):
+            user_dict[user] = {}
 
     return user_dict[user]
 
@@ -178,11 +189,24 @@ def _update_dict_for_user(user, dict_for_user):
     :return:
     :rtype:
     """
-    dict_to_dump = {user: dict_for_user}
+    if FILE_MODE:
+        dict_to_dump = {user: dict_for_user}
 
-    filename = _get_file_name(user)
-    with open(filename, 'wb') as outp:
-        json.dump(Serializable.dumps(dict_to_dump), outp)
+        filename = _get_file_name(user)
+        with open(filename, 'wb') as outp:
+            json.dump(Serializable.dumps(dict_to_dump), outp)
+
+    else:
+        filename = os.path.join(os.getcwd(), 'results', WIKINAME, 'user_graph.json')
+        with open(filename, 'rb') as inp:
+            user_dict = Serializable.loads(json.load(inp))
+
+        user_dict[user] = dict_for_user
+
+        with open(filename, 'wb') as outp:
+            json.dump(Serializable.dumps(user_dict),outp)
+
+
 
 
 def _update_edge(user, rev, full_dict):

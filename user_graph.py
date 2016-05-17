@@ -15,7 +15,7 @@ import re
 from db import DataAccess
 
 WIKINAME = 'rmywiki'
-USER_INDEX = os.path.join(os.getcwd(),'results',WIKINAME,'user_index.json')
+USER_INDEX = os.path.join(os.getcwd(), 'results', WIKINAME, 'user_index.json')
 
 # user_graph = {}
 global NONECTR
@@ -118,37 +118,35 @@ def add_to_graph(file_content):  # , user_graph, user_contribs):
 
 
 def _get_index_entry(user):
-
     if os.path.isfile(USER_INDEX):
         with open(USER_INDEX, 'rb') as inp:
             index_of_users = json.load(inp)
     else:
         index_of_users = {}
 
-    return index_of_users.get(user,_set_into_index(user))
+    return index_of_users.get(user, _set_into_index(user))
+
 
 def _set_into_index(user):
-
     if os.path.isfile(USER_INDEX):
-        with open(USER_INDEX,'rb') as inp:
+        with open(USER_INDEX, 'rb') as inp:
             index_of_users = json.load(inp)
     else:
         index_of_users = {}
 
     index_of_users[user] = str(uuid.uuid5(uuid.NAMESPACE_OID, user))
 
-    with open(USER_INDEX,'wb') as outp:
-        json.dump(index_of_users,outp)
+    with open(USER_INDEX, 'wb') as outp:
+        json.dump(index_of_users, outp)
 
     return index_of_users.get(user)
 
 
-def _get_file_name(user, suffix = 'dict'):
-
+def _get_file_name(user, suffix='dict'):
     index_entry_for_user = _get_index_entry(user)
 
     user_file = "%s_%s.json" % (index_entry_for_user, suffix)
-    return os.path.join(os.getcwd(),'results', WIKINAME, user_file)
+    return os.path.join(os.getcwd(), 'results', WIKINAME, user_file)
 
 
 def _get_dict_for_user(user):
@@ -167,7 +165,7 @@ def _get_dict_for_user(user):
         with open(filename, 'rb') as inp:
             user_dict = Serializable.loads(json.load(inp))
     else:
-        user_dict = {user:{}}
+        user_dict = {user: {}}
 
     return user_dict[user]
 
@@ -180,7 +178,7 @@ def _update_dict_for_user(user, dict_for_user):
     :return:
     :rtype:
     """
-    dict_to_dump = {user:dict_for_user}
+    dict_to_dump = {user: dict_for_user}
 
     filename = _get_file_name(user)
     with open(filename, 'wb') as outp:
@@ -205,7 +203,7 @@ def _update_edge(user, rev, full_dict):
 
     user_dict = _get_dict_for_user(user)
 
-    rev_key = (rev, full_dict['timestamp'] -full_dict['t12'])
+    rev_key = (rev, full_dict['timestamp'] - full_dict['t12'])
 
     if not user_dict.has_key(rev_key):
         user_dict[rev_key] = []
@@ -345,8 +343,8 @@ if __name__ == "__main__":
     print base_dir
     print os.path.isdir(base_dir)
 
-    if not os.path.isdir(os.path.join(os.getcwd(),'results',WIKINAME)):
-        os.mkdir(os.path.join(os.getcwd(),'results',WIKINAME))
+    if not os.path.isdir(os.path.join(os.getcwd(), 'results', WIKINAME)):
+        os.mkdir(os.path.join(os.getcwd(), 'results', WIKINAME))
 
     # user_graph_file = os.path.join(os.getcwd(), 'results', 'user_graph_test.json')
     #

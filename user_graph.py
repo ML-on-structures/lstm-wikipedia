@@ -17,7 +17,7 @@ from db import DataAccess
 WIKINAME = 'rmywiki'
 USER_INDEX = os.path.join(os.getcwd(), 'results', WIKINAME, 'user_index.json')
 
-FILE_MODE = True
+FILE_MODE = False
 # user_graph = {}
 global NONECTR
 NONECTR = 0
@@ -209,7 +209,7 @@ def _update_dict_for_user(user, dict_for_user):
 
 
 
-def _update_edge(user, rev, full_dict):
+def _update_edge(user, rev, full_dict, user_graph=None):
     """
     Update the dictionary for user witha list to the revisions rev.
     The full dict consists of an item which needs to be added to the list of
@@ -225,21 +225,36 @@ def _update_edge(user, rev, full_dict):
     :rtype:
     """
 
-    user_dict = _get_dict_for_user(user)
+    if user_graph is not None:
 
-    # rev_key = (rev, full_dict['timestamp'] - full_dict['t12'])
-    rev_key = rev
-    if not user_dict.has_key(rev_key):
-        user_dict[rev_key] = {}
-        user_dict[rev_key]['timestamp'] = int(full_dict['timestamp']) - int(full_dict['t12'])
-        user_dict[rev_key]['list'] = []
+        # Update entry of this user in graph
+        if not user_graph.has_key(user):
+            user_graph[user] = {}
 
-    user_dict[rev_key]['list'].append(full_dict)
+        if not user_graph[user].has_key(rev):
+            user_graph[user][rev] = {}
+            user_graph[user][rev]['timestamp'] = int(full_dict['timestamp']) - int(full_dict['t12'])
+            user_graph[user][rev]['list'] = []
+        user_graph[user][rev]['list'].append(full_dict)
 
-    _update_dict_for_user(user, user_dict)
+        return user_graph
+    else:
+
+        user_dict = _get_dict_for_user(user)
+
+        # rev_key = (rev, full_dict['timestamp'] - full_dict['t12'])
+        rev_key = rev
+        if not user_dict.has_key(rev_key):
+            user_dict[rev_key] = {}
+            user_dict[rev_key]['timestamp'] = int(full_dict['timestamp']) - int(full_dict['t12'])
+            user_dict[rev_key]['list'] = []
+
+        user_dict[rev_key]['list'].append(full_dict)
+
+        _update_dict_for_user(user, user_dict)
 
 
-def add_graph_content(file_content):
+def add_graph_content(file_content, user_graph=None):
     """
 
     :param file_content:
@@ -255,7 +270,10 @@ def add_graph_content(file_content):
             line_dict['timestamp'] = line_broken[1]
 
             # This entry in line_dict represents judgement of uname1's rev1 revision by uname2 using rev2
-            _update_edge(user=line_dict['uname1'], rev=line_dict['rev1'], full_dict=line_dict)
+            if user_graph is not None:
+                _update_edge(user=line_dict['uname1'], rev=line_dict['rev1'], full_dict=line_dict, user_graph=user_graph)
+            else:
+                _update_edge(user=line_dict['uname1'], rev=line_dict['rev1'], full_dict=line_dict)
 
 
 def get_files(base_dir):  # , user_graph, user_contribs):
@@ -364,6 +382,27 @@ def get_split_files(base_dir):  # , user_graph):
                 add_to_graph(file_content)
 
 
+def get_user_dict(base_dir):
+    """
+    Get all the files in nested directories under base_dir
+
+    :param base_dir: Absolute path of the base directory
+    :type base_dir: str
+    :return:
+    :rtype:
+    """
+    user_graph = {}
+    for root, dirs, files in os.walk(base_dir):
+        for dir in dirs:
+            for r2, d2, f2 in os.walk(os.path.join(root, dir)):
+                for file in f2:
+                    with gzip.open(os.path.join(r2, file), 'rb') as input:
+                        file_content = input.read()
+                        # add_to_graph(file_content)
+                        add_graph_content(file_content=file_content, user_graph=user_graph)
+    return user_graph
+
+
 if __name__ == "__main__":
     base_dir = "/home/rakshit/Research/ML/wikipedia_lstm/data/%s_pipe/stats/" % (WIKINAME)
     print base_dir
@@ -391,8 +430,14 @@ if __name__ == "__main__":
     # get_files(base_dir, user_graph, user_contribs)
 
     # get_split_files(base_dir)
-    get_files(base_dir)
+    if FILE_MODE:
+        get_files(base_dir)
 
+    else:
+        user_graph = get_user_dict(base_dir)
+        filename = os.path.join(os.getcwd(), 'results', WIKINAME, 'user_graph.json')
+        with open(filename, 'wb') as outp:
+            json.dump(Serializable.dumps(user_graph),outp)
     # with open(user_graph_file, 'wb+') as output:
     #     json.dump(user_graph, output)
     #

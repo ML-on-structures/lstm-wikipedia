@@ -227,12 +227,14 @@ def _update_edge(user, rev, full_dict):
 
     user_dict = _get_dict_for_user(user)
 
-    rev_key = (rev, full_dict['timestamp'] - full_dict['t12'])
-
+    # rev_key = (rev, full_dict['timestamp'] - full_dict['t12'])
+    rev_key = rev
     if not user_dict.has_key(rev_key):
-        user_dict[rev_key] = []
+        user_dict[rev_key] = {}
+        user_dict[rev_key]['timestamp'] = int(full_dict['timestamp']) - int(full_dict['t12'])
+        user_dict[rev_key]['list'] = []
 
-    user_dict[rev_key].append(full_dict)
+    user_dict[rev_key]['list'].append(full_dict)
 
     _update_dict_for_user(user, user_dict)
 

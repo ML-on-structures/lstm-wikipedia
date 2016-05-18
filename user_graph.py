@@ -207,6 +207,31 @@ def _update_dict_for_user(user, dict_for_user):
             json.dump(Serializable.dumps(user_dict),outp)
 
 
+def _cleanup_user_list(entry):
+    """
+    Cleanup the list of user's contribution's arguments and retain only the least n01 and n12 combination
+    :param param:
+    :type param:
+    :return:
+    :rtype:
+    """
+    if len(entry) == 1:
+        return entry
+
+    # n01_min = min(entry, key=lambda x:x['n01'])
+    # n12_min = min(entry, key=lambda x:x['n12'])
+    #
+    # if any(d['n01']==n01_min and d['n02']==n12_min for d in entry):
+    #     print "yeah!"
+
+    n01_min = min([i['n01'] for i in entry])
+    n12_min = min([i['n12'] for i in entry])
+
+    for i in entry:
+        if i['n01']==n01_min and i['n12']==n12_min:
+            return [i]
+
+    return entry
 
 
 def _update_edge(user, rev, full_dict, user_graph=None):
@@ -236,6 +261,7 @@ def _update_edge(user, rev, full_dict, user_graph=None):
             user_graph[user][rev]['timestamp'] = int(full_dict['timestamp']) - int(full_dict['t12'])
             user_graph[user][rev]['list'] = []
         user_graph[user][rev]['list'].append(full_dict)
+        user_graph[user][rev]['list']=_cleanup_user_list(user_graph[user][rev]['list'])
 
         return user_graph
     else:
@@ -254,6 +280,25 @@ def _update_edge(user, rev, full_dict, user_graph=None):
         _update_dict_for_user(user, user_dict)
 
 
+def _correct_types(line_dict):
+    # pattern = "EditInc (?P<time>\d+) PageId: (?P<pageid>\d+) Delta: (?P<delta_char>\d+).(?P<delta_mant>\d+) rev0: (?P<rev0>\d+) uid0: (?P<uid0>\d+) uname0: (?P<uname0>\S+) rev1: (?P<rev1>\d+) uid1: (?P<uid1>\d+) uname1: (?P<uname1>\S+) rev2: (?P<rev2>\d+) uid2: (?P<uid2>\d+) uname2: (?P<uname2>\S+) d01: (?P<d01_char>\d+).(?P<d01_mant>\d+) d02: (?P<d02_char>\d+).(?P<d02_mant>\d+) d12: (?P<d12_char>\d+).(?P<d12_mant>\d+) dp2: (?P<dp2_char>\d+).(?P<dp2_mant>\d+) n01: (?P<n01>\d+) n12: (?P<n12>\d+) t01: (?P<t01_char>\d+).(?P<t01_mant>\d+) t12: (?P<t12_char>\d+).(?P<t12_mant>\d+)"
+    #
+
+    int_list = ['PageId','uid0','uid1','uid2','t12','t01','rev0','rev1','rev2','n01','n12',]
+    float_list = ['d01','d12','d02','dp2','Delta']
+    str_list = ['uname0','uname1','uname2']
+
+    for k,v in line_dict.iteritems():
+
+        if k in int_list:
+            line_dict[k] = int(v)
+        elif k in float_list:
+            line_dict[k] = float(v)
+
+    return line_dict
+
+
+
 def add_graph_content(file_content, user_graph=None):
     """
 
@@ -267,7 +312,8 @@ def add_graph_content(file_content, user_graph=None):
         line_broken = line.split('|')
         if line_broken[0] == "EditInc":
             line_dict = {i.split(':')[0]: i.split(':')[1] for i in line_broken[2:]}
-            line_dict['timestamp'] = line_broken[1]
+            line_dict['timestamp'] = int(line_broken[1])
+            line_dict = _correct_types(line_dict)
 
             # This entry in line_dict represents judgement of uname1's rev1 revision by uname2 using rev2
             if user_graph is not None:
@@ -402,6 +448,49 @@ def get_user_dict(base_dir):
                         add_graph_content(file_content=file_content, user_graph=user_graph)
     return user_graph
 
+#
+# def _compute_lstm_forward(user, timestamp, depth_now, max_depth):
+#     user_revisions = _get_user_revisions(user, timestamp)
+#
+#     if depth_now < max_depth:
+#
+#         # Initialize LSTM input matrix entry for user
+#
+#         for rev in user_revisions:
+#             graph_features = _get_graph_features(rev['user2'], rev['timestamp'], depth_now+1, max_depth)
+#             rev_features = _get_rev_features(rev)
+#
+#
+#     else:
+#         return None
+#
+#         # Matrix row for LSTM input here combines rev features and graph features together
+#
+#
+# def graph_lstm(depth_now = 0, max_depth=3):
+#     """
+#
+#     :return:
+#     :rtype:
+#     """
+#     users = []
+#
+#
+#     for i in users:
+#
+#         _compute_lstm_forward(i, depth_now, max_depth)
+
+
+
+
+
+
+
+
+
+        # Create the entry matrix for lstm at
+
+
 
 if __name__ == "__main__":
     base_dir = os.path.join(os.getcwd(),'data','%s_pipe/stats/' % (WIKINAME))
@@ -437,7 +526,7 @@ if __name__ == "__main__":
         user_graph = get_user_dict(base_dir)
         filename = os.path.join(os.getcwd(), 'results', WIKINAME, 'user_graph.json')
         with open(filename, 'wb') as outp:
-            json.dump(Serializable.dumps(user_graph),outp)
+            outp.write(Serializable.dumps(user_graph))
     # with open(user_graph_file, 'wb+') as output:
     #     json.dump(user_graph, output)
     #

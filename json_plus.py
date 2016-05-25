@@ -26,6 +26,10 @@ class Serializable(object):
     def to_json(self, pack_ndarray=True, tolerant=True):
         return Serializable.dumps(self, pack_ndarray=pack_ndarray, tolerant=tolerant)
 
+    def dump(self, fp, pack_ndarray=True, tolerant=True):
+        return fp.write(Serializable.dumps(self, pack_ndarray=pack_ndarray, tolerant=tolerant))
+
+
     @staticmethod
     def dumps(obj, pack_ndarray=True, tolerant=True):
         def custom(o):
@@ -38,10 +42,6 @@ class Serializable(object):
             elif isinstance(o, datetime.datetime):
                 d = {'meta_class': 'datetime.datetime',
                      'date': o.isoformat()}
-                return d
-            elif isinstance(o, (tuple, list)):
-                d = {'meta_class': 'tuple',
-                     'tuple': list(o)}
                 return d
             elif isinstance(o, set):
                 d = {'meta_class': 'set',
@@ -67,7 +67,7 @@ class Serializable(object):
                 return d
 
             # Normal Python types are unchanged
-            elif isinstance(o, (int, long, str, unicode, float, bool, list, dict)): # tuple, dict)):
+            elif isinstance(o, (int, long, str, unicode, float, bool, list, tuple, dict)):
                 return o
 
             # These two defaults are catch-all
@@ -98,9 +98,6 @@ class Serializable(object):
             elif meta_class == 'set':
                 # Set.
                 return set(o['set'])
-            elif meta_class == 'tuple':
-                # Tuple.
-                return tuple(o['tuple'])
             # Numpy arrays.
             elif meta_class == 'numpy.ndarray':
                 data = base64.b64decode(o['results'])
@@ -148,6 +145,10 @@ class Serializable(object):
     @staticmethod
     def loads(s):
         return Serializable.from_json(s)
+
+    @staticmethod
+    def load(fp):
+        return Serializable.loads(fp.read())
 
 
 class TestSerializable(unittest.TestCase):
@@ -225,15 +226,6 @@ class TestSerializable(unittest.TestCase):
         s = ['a', 'b', 'c', {'a':213}]
         x = Serializable.dumps(s)
         print "Set representation:", x
-        t = Serializable.loads(x)
-        self.assertEqual(s, t)
-
-    def test_tuple(self):
-        # Not passing for now
-        s = (12.42, 11, 'a',"testing")
-        print type(s)
-        x = Serializable.dumps(s)
-        print "Tuple representation:", x
         t = Serializable.loads(x)
         self.assertEqual(s, t)
 

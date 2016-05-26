@@ -17,9 +17,10 @@ from multi_layer_lstm.multi_layer_LSTM import Instance_node, Multi_Layer_LSTM
 
 import numpy as np
 
-WIKINAME = 'astwiki'
-# WIKINAME = 'rmywiki'
 
+# WIKINAME = 'rmywiki'  # Very small
+WIKINAME = 'astwiki'  # Medium
+# WIKINAME = 'bgwiki'   # Large
 DEFAULT_PARAMS = {}
 
 FEATURE_VECTOR_SIZE = 8
@@ -157,7 +158,10 @@ def user_quitting_labels(user_graph):
 
 
 def _qual(d01, d12, d02):
-    return (1.0 * (d02 - d12) / 1.0 * d01)
+    if d01:
+        return (1.0 * (d02 - d12) / (1.0 * d01))
+    else:
+        return (1.0 * (d02 - d12))
 
 
 def _reverts(v):
@@ -295,7 +299,7 @@ def _get_features_of_edit(data, feature_vector_size = FEATURE_VECTOR_SIZE):
         return None
 
 
-def build_entries_for_learning(user_graph, labels, max_depth):
+def build_entries_for_learning(user_graph, labels, max_depth=None):
     """
     Build the structure using Instance nodes form multi_layer_LSTM
 
@@ -436,6 +440,7 @@ if __name__ == "__main__":
 
     with open(graph_file, 'rb') as inp:
         wikidata = Serializable.load(inp)
+        print len(wikidata)
 
     # contrib_file = os.path.join(os.getcwd(), 'results', 'user_contrib_test.json')
     #
@@ -447,5 +452,32 @@ if __name__ == "__main__":
     # build_labels_for_user_quitting(user_contribs=user_contribs)
     # build_labels_for_revision_quality(wikidata=wikidata)
 
-    labels = user_quitting_labels(wikidata)
-    # labels = user_reversion_label(wikidata)
+    # labels = user_quitting_labels(wikidata)
+    labels = user_reversion_label(wikidata)
+    instance_list = build_entries_for_learning(user_graph=wikidata, labels=labels)
+
+    HIDDEN_LAYER_SIZES = [2, 2]
+    INPUT_SIZES = [8,13]
+    LEARNING_RATE_VECTOR = [0.05,0.005]
+    DEPTH = 1
+    OBJECTIVE_FUNCTION = "softmax_classification"
+    lstm_stack = Multi_Layer_LSTM(DEPTH, HIDDEN_LAYER_SIZES, INPUT_SIZES)
+    #random.seed(500)
+    random.shuffle(instance_list)
+
+    training_set_dist = 0.70
+    training_set_size = int(training_set_dist * len(instance_list))
+    training_set = instance_list[0:training_set_size]
+    # get labels proportion
+    label_count = 0.0
+    for i in training_set:
+        if i.get_label() == 1.0:
+            label_count += 1.0
+
+    label_proportion = label_count / training_set_size
+    print "Label proportion: ", label_proportion
+    test_set = instance_list[training_set_size:len(instance_list)]
+    lstm_stack.train_model_force_balance(training_set, no_of_instances = 1000, max_depth= DEPTH - 1, objective_function= OBJECTIVE_FUNCTION, learning_rate_vector= LEARNING_RATE_VECTOR)
+    lstm_stack.test_model_simple(test_set, max_depth = DEPTH - 1)
+
+

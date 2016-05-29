@@ -13,10 +13,11 @@ import random
 from pprint import pprint
 from datetime import datetime
 from json_plus import Serializable
-from multi_layer_lstm.multi_layer_LSTM import Instance_node, Multi_Layer_LSTM
-
+# from multi_layer_lstm.multi_layer_LSTM import Instance_node, Multi_Layer_LSTM
+from multi_LSTM import InstanceNode, SequenceItem, MultiLSTM
 import numpy as np
 
+from multi_layer_lstm.multi_layer_LSTM import Instance_node
 
 # WIKINAME = 'rmywiki'  # Very small
 WIKINAME = 'astwiki'  # Medium
@@ -61,8 +62,9 @@ def build_labels_for_revision_quality(wikidata):
 def _days(v):
     return v / 3600 / 24
 
+
 def _secs_in_days(d):
-    return d*3600*24
+    return d * 3600 * 24
 
 
 def build_labels_for_user_quitting(user_contribs):
@@ -143,7 +145,6 @@ def user_quitting_labels(user_graph):
 
     print len(user_graph)
 
-
     max_time = max([max([i['timestamp'] for k, i in a.iteritems()]) for t, a in user_graph.iteritems()])
 
     quit_labels = {k: 0 if _days(max_time - max([i['timestamp'] for _, i in v.iteritems()])) < MAX_DAYS else 1 for k, v
@@ -185,14 +186,17 @@ def _graph_from_days_back(graph, ending=7, starting_from=None):
     check_time = max_time - _secs_in_days(ending)
 
     if starting_from is None:
-        return {user:{k:v for k,v in values.iteritems() if v['timestamp']<check_time} for user,values in graph.iteritems()}
+        return {user: {k: v for k, v in values.iteritems() if v['timestamp'] < check_time} for user, values in
+                graph.iteritems()}
 
     else:
         pop_list = []
         previous_time = max_time - _secs_in_days(starting_from)
-        ret_graph = {user:{k:v for k,v in values.iteritems() if v['timestamp']<check_time and v['timestamp']>previous_time}  for user,values in graph.iteritems()}
+        ret_graph = {
+        user: {k: v for k, v in values.iteritems() if v['timestamp'] < check_time and v['timestamp'] > previous_time}
+        for user, values in graph.iteritems()}
 
-        pop_list = [user for user, values in ret_graph.iteritems() if len(values)==0]
+        pop_list = [user for user, values in ret_graph.iteritems() if len(values) == 0]
 
         for i in pop_list:
             ret_graph.pop(i)
@@ -217,7 +221,8 @@ def user_reversion_label(user_graph):
 
     user_graph = _graph_from_days_back(graph=user_graph, ending=14)
 
-    user_last_revs = {k: max(v.values(), key=lambda x: x['timestamp']) if len(v) else pop_list.append(k) for k, v in user_graph.iteritems()}
+    user_last_revs = {k: max(v.values(), key=lambda x: x['timestamp']) if len(v) else pop_list.append(k) for k, v in
+                      user_graph.iteritems()}
 
     # print pop_list
     for i in pop_list:
@@ -247,12 +252,11 @@ def learn_from_graph(user_graph, user_labels, params=DEFAULT_PARAMS):
 
 
 def _dist_normal(distance):
-    return distance/100.0
+    return distance / 100.0
 
 
 def _normalize_vector_for_features(element, feature_vector_size):
-
-    TIME_DENOMINATOR = 100000.0
+    TIME_DENOMINATOR = 10000000.0
 
     fv = np.zeros(feature_vector_size)
 
@@ -266,9 +270,16 @@ def _normalize_vector_for_features(element, feature_vector_size):
     fv[2] = _dist_normal(element['d02'])
 
     # Time 01
-    fv[3] = np.log(1+element['t01']/TIME_DENOMINATOR)
+    # if element['t01'] < 0:
+    #     print element
+    fv[3] = np.log(1 + abs(element['t01']) / TIME_DENOMINATOR)
+    # fv[3] = element['t01'] / (TIME_DENOMINATOR*10)
+
     # Time 12
-    fv[4] = np.log(1+element['t12']/TIME_DENOMINATOR)
+    # if element['t12'] < 0:
+    #     print element
+    fv[4] = np.log(1 + abs(element['t12']) / TIME_DENOMINATOR)
+    # fv[4] = element['t12']/(TIME_DENOMINATOR*10)
 
     # Delta
     fv[5] = _dist_normal(element['Delta'])
@@ -276,12 +287,12 @@ def _normalize_vector_for_features(element, feature_vector_size):
     fv[6] = _dist_normal(element['dp2'])
 
     # Quality calculated by 1 on 0
-    fv[7] = _qual(d01=element['d01'],d02=element['d02'],d12=element['d12'])
+    fv[7] = _qual(d01=element['d01'], d02=element['d02'], d12=element['d12'])
 
     return fv
 
 
-def _get_features_of_edit(data, feature_vector_size = FEATURE_VECTOR_SIZE):
+def _get_features_of_edit(data, feature_vector_size=FEATURE_VECTOR_SIZE):
     """
 
     :param data:
@@ -328,9 +339,24 @@ def build_entries_for_learning(user_graph, labels, max_depth=None):
         if not labels.has_key(user):
             continue
         new_node = Instance_node(label=labels[user])
-        for edit,data in values.iteritems():
+        for edit, data in values.iteritems():
             new_child = Instance_node()
             new_child.feature_vector = _get_features_of_edit(data)
+
+            # new_child.feature_vector = _get_features_of_edit(data)
+
+            # 2nd layer stuff begins
+            # print data
+            new_child_node = data['list'][0]['uname2']
+            if not user_graph.has_key(new_child_node):
+                continue
+            limit_items = {k: user_graph[new_child_node][k] for k in user_graph[new_child_node].keys()[:5]}
+            for e2, d2 in limit_items.iteritems():
+                new_grandchild = Instance_node()
+                new_grandchild.feature_vector = _get_features_of_edit(d2)
+                if new_grandchild.feature_vector is not None:
+                    new_child.children.append(new_grandchild)
+            # 2nd layer stuff ends
             if new_child.feature_vector is not None:
                 new_node.children.append(new_child)
 
@@ -338,6 +364,73 @@ def build_entries_for_learning(user_graph, labels, max_depth=None):
 
     return instance_list
 
+
+def _get_sequence_list_for(values, sequence_control=None, limiter=None):
+    """
+    Based on the sequence control, generate sequence list of SequenceItem type objects
+    :param values:
+    :type values:
+    :param sequence_control:
+    :type sequence_control:
+    :return:
+    :rtype:
+    """
+    sequence_list = []
+    for edit, data in values.iteritems():
+        if not len(data):
+            continue
+        if not data.has_key('list'):
+            continue
+        if not len(data['list']):
+            continue
+        if not labels.has_key(data['list'][0]['uname2']):
+            continue
+
+        # After all checks to not enter an item, create the SequenceItem object
+        # and get its features
+        link_node = data['list'][0]['uname2']
+        s = SequenceItem(item_id=edit,
+                         link_node_id=link_node,
+                         feature_vector=_get_features_of_edit(data),
+                         timestamp=data['timestamp'],
+                         action_time=data['list'][0]['timestamp'])
+
+        sequence_list.append(s)
+
+    if sequence_control == 'time':
+        return sorted(sequence_list, key=lambda x: x.timestamp)[:limiter]
+
+
+def generate_instance_graph(graph_data, labels):
+    """
+    Generate the graph structure using Instance and SequenceItem classes
+
+    instance_graph = {
+        'user1':InstanceNode(label, [SequenceItem], gradient, cache, sequence_control)
+    }
+
+    :param graph_data:
+    :type graph_data:dict
+    :return:
+    :rtype:
+    """
+
+    SEQ_CONT = 'time'
+    LIMITER = 20
+
+    instance_graph = {}
+
+    for user, values in graph_data.iteritems():
+        if not labels.has_key(user):
+            continue
+        new_node = InstanceNode(label=labels[user], sequence_control=SEQ_CONT)
+
+        # Now that label is set for node, get its sequence list
+        new_node.sequence_list = _get_sequence_list_for(values, sequence_control=SEQ_CONT, limiter=LIMITER)
+
+        instance_graph[user] = new_node
+
+    return instance_graph
 
 
 class GraphLearning(Serializable):
@@ -404,7 +497,8 @@ class GraphLearning(Serializable):
             # Initialize LSTM input matrix entry for user
 
             for instance in node_data_list:
-                previous_layer_lstm_features = self._compute_features_for_lstm(instance['user2'], instance['timestamp'], depth_now + 1)
+                previous_layer_lstm_features = self._compute_features_for_lstm(instance['user2'], instance['timestamp'],
+                                                                               depth_now + 1)
                 entry_features = _get_rev_features(instance)
 
                 entry_mat = _generate_matrix_for_depth()
@@ -432,7 +526,6 @@ class GraphLearning(Serializable):
             self._compute_features_for_lstm(item)
 
 
-
 if __name__ == "__main__":
     # Get the data for concerned wiki
 
@@ -440,6 +533,7 @@ if __name__ == "__main__":
 
     with open(graph_file, 'rb') as inp:
         wikidata = Serializable.load(inp)
+        # wikidata = {k:wikidata[k] for k in random.sample(wikidata.keys(), 10000)}
         print len(wikidata)
 
     # contrib_file = os.path.join(os.getcwd(), 'results', 'user_contrib_test.json')
@@ -454,18 +548,25 @@ if __name__ == "__main__":
 
     # labels = user_quitting_labels(wikidata)
     labels = user_reversion_label(wikidata)
-    instance_list = build_entries_for_learning(user_graph=wikidata, labels=labels)
+    # instance_list = build_entries_for_learning(user_graph=wikidata, labels=labels)
+    instance_graph = generate_instance_graph(wikidata, labels)
+    instance_list = instance_graph.values()
 
-    HIDDEN_LAYER_SIZES = [2, 2]
-    INPUT_SIZES = [8,13]
-    LEARNING_RATE_VECTOR = [0.05,0.005]
+    HIDDEN_LAYER_SIZES = [2, 2, 2]
+    INPUT_SIZES = [8, 8, 8]
+    LEARNING_RATE_VECTOR = [0.05, 0.5, 0.05]
     DEPTH = 1
     OBJECTIVE_FUNCTION = "softmax_classification"
-    lstm_stack = Multi_Layer_LSTM(DEPTH, HIDDEN_LAYER_SIZES, INPUT_SIZES)
-    #random.seed(500)
+    NUMBER_OF_INSTANCES = 10000
+    # lstm_stack = Multi_Layer_LSTM(DEPTH, HIDDEN_LAYER_SIZES, INPUT_SIZES)
+    lstm_stack = MultiLSTM(max_depth=DEPTH,
+                           hidden_layer_sizes=HIDDEN_LAYER_SIZES,
+                           input_sizes=INPUT_SIZES,
+                           instance_graph=instance_graph)
+    random.seed(500)
     random.shuffle(instance_list)
 
-    training_set_dist = 0.70
+    training_set_dist = 0.60
     training_set_size = int(training_set_dist * len(instance_list))
     training_set = instance_list[0:training_set_size]
     # get labels proportion
@@ -477,7 +578,8 @@ if __name__ == "__main__":
     label_proportion = label_count / training_set_size
     print "Label proportion: ", label_proportion
     test_set = instance_list[training_set_size:len(instance_list)]
-    lstm_stack.train_model_force_balance(training_set, no_of_instances = 1000, max_depth= DEPTH - 1, objective_function= OBJECTIVE_FUNCTION, learning_rate_vector= LEARNING_RATE_VECTOR)
-    lstm_stack.test_model_simple(test_set, max_depth = DEPTH - 1)
-
-
+    lstm_stack.train_model_force_balance(training_set, no_of_instances=NUMBER_OF_INSTANCES, max_depth=DEPTH - 1,
+                                         objective_function=OBJECTIVE_FUNCTION,
+                                         learning_rate_vector=LEARNING_RATE_VECTOR)
+    lstm_stack.test_model_simple(test_set, max_depth=DEPTH - 1)
+    print "Depth was: %d"%(DEPTH)

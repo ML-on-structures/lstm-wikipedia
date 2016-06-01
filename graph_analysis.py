@@ -12,6 +12,7 @@ import os
 import random
 from pprint import pprint
 from datetime import datetime
+import time
 from json_plus import Serializable
 # from multi_layer_lstm.multi_layer_LSTM import Instance_node, Multi_Layer_LSTM
 from multi_LSTM import InstanceNode, SequenceItem, MultiLSTM
@@ -401,7 +402,7 @@ def _get_sequence_list_for(values, sequence_control=None, limiter=None):
         return sorted(sequence_list, key=lambda x: x.timestamp)[:limiter]
 
 
-def generate_instance_graph(graph_data, labels):
+def generate_instance_graph(graph_data, labels, limiter=20):
     """
     Generate the graph structure using Instance and SequenceItem classes
 
@@ -416,7 +417,7 @@ def generate_instance_graph(graph_data, labels):
     """
 
     SEQ_CONT = 'time'
-    LIMITER = 20
+    LIMITER = limiter
 
     instance_graph = {}
 
@@ -526,6 +527,10 @@ class GraphLearning(Serializable):
             self._compute_features_for_lstm(item)
 
 
+def _f1(prec, rec):
+    return (2.0*prec*rec)/(1.0*(prec+rec))
+
+
 if __name__ == "__main__":
     # Get the data for concerned wiki
 
@@ -535,6 +540,8 @@ if __name__ == "__main__":
         wikidata = Serializable.load(inp)
         # wikidata = {k:wikidata[k] for k in random.sample(wikidata.keys(), 10000)}
         print len(wikidata)
+
+    BREADTH = 7
 
     # contrib_file = os.path.join(os.getcwd(), 'results', 'user_contrib_test.json')
     #
@@ -549,37 +556,104 @@ if __name__ == "__main__":
     # labels = user_quitting_labels(wikidata)
     labels = user_reversion_label(wikidata)
     # instance_list = build_entries_for_learning(user_graph=wikidata, labels=labels)
-    instance_graph = generate_instance_graph(wikidata, labels)
+    instance_graph = generate_instance_graph(wikidata, labels, limiter=BREADTH)
     instance_list = instance_graph.values()
+
+    # for depth in [1,2]:
 
     HIDDEN_LAYER_SIZES = [2, 2, 2]
     INPUT_SIZES = [8, 8, 8]
-    LEARNING_RATE_VECTOR = [0.05, 0.5, 0.05]
-    DEPTH = 1
+    LEARNING_RATE_VECTOR = [0.05, 0.5, 0.5]
+    DEPTH = 2
     OBJECTIVE_FUNCTION = "softmax_classification"
-    NUMBER_OF_INSTANCES = 10000
+    NUMBER_OF_INSTANCES = 50000
     # lstm_stack = Multi_Layer_LSTM(DEPTH, HIDDEN_LAYER_SIZES, INPUT_SIZES)
-    lstm_stack = MultiLSTM(max_depth=DEPTH,
-                           hidden_layer_sizes=HIDDEN_LAYER_SIZES,
-                           input_sizes=INPUT_SIZES,
-                           instance_graph=instance_graph)
-    random.seed(500)
-    random.shuffle(instance_list)
 
-    training_set_dist = 0.60
-    training_set_size = int(training_set_dist * len(instance_list))
-    training_set = instance_list[0:training_set_size]
-    # get labels proportion
-    label_count = 0.0
-    for i in training_set:
-        if i.get_label() == 1.0:
-            label_count += 1.0
+    TEST_RANGE = 20
 
-    label_proportion = label_count / training_set_size
-    print "Label proportion: ", label_proportion
-    test_set = instance_list[training_set_size:len(instance_list)]
-    lstm_stack.train_model_force_balance(training_set, no_of_instances=NUMBER_OF_INSTANCES, max_depth=DEPTH - 1,
-                                         objective_function=OBJECTIVE_FUNCTION,
-                                         learning_rate_vector=LEARNING_RATE_VECTOR)
-    lstm_stack.test_model_simple(test_set, max_depth=DEPTH - 1)
-    print "Depth was: %d"%(DEPTH)
+    results = {}
+    total_prec_list = {}
+    total_prec_list[0] = []
+    total_prec_list[1] = []
+
+    total_recall_list = {}
+    total_recall_list[0] = []
+    total_recall_list[1] = []
+
+    total_f1_list = {}
+    total_f1_list[0] = []
+    total_f1_list[1] = []
+
+    total_avg_recall_list = []
+
+
+    for iter in range(TEST_RANGE):
+        t1 = time.clock()
+        lstm_stack = MultiLSTM(max_depth=DEPTH,
+                               hidden_layer_sizes=HIDDEN_LAYER_SIZES,
+                               input_sizes=INPUT_SIZES,
+                               instance_graph=instance_graph)
+        # random.seed(500)
+        random.shuffle(instance_list)
+
+        training_set_dist = 0.60
+        training_set_size = int(training_set_dist * len(instance_list))
+        training_set = instance_list[0:training_set_size]
+        # get labels proportion
+        label_count = 0.0
+        for i in training_set:
+            if i.get_label() == 1.0:
+                label_count += 1.0
+
+        label_proportion = label_count / training_set_size
+        print "Label proportion: ", label_proportion
+        test_set = instance_list[training_set_size:len(instance_list)]
+
+        lstm_stack.train_model_force_balance(training_set, no_of_instances=NUMBER_OF_INSTANCES, max_depth=DEPTH - 1,
+                                             objective_function=OBJECTIVE_FUNCTION,
+                                             learning_rate_vector=LEARNING_RATE_VECTOR)
+        t2 = time.clock()
+        precision_dict, recall_dict, recall_list, all_labels = lstm_stack.test_model_simple(test_set, max_depth=DEPTH - 1)
+
+        t3 = time.clock()
+
+        results_file = os.path.join(os.getcwd(), 'results', WIKINAME, 'results_breadth_%d_depth_%d_instances_%d.json' % (BREADTH, DEPTH, NUMBER_OF_INSTANCES))
+
+        print "Training completed in %r"%(t2-t1)
+        if os.path.isfile(results_file):
+            with open(results_file, 'rb') as inp:
+                results = (Serializable.loads(inp.read()))
+        else:
+            results = {}
+
+        for label in all_labels:
+            label = str(label)
+            # total_prec_list[label].append(precision_dict[label])
+            # total_recall_list[label].append(recall_dict[label])
+            # total_avg_recall_list.append(np.mean(recall_list))
+            # total_f1_list[label].append(_f1(precision_dict[label], recall_dict[label]))
+            for keyname in ['prec','rec','f1']:
+                if not results.has_key(keyname):
+                    results[keyname] = {}
+                if not results[keyname].has_key(label):
+                    results[keyname][label] = []
+            if not results.has_key('avg_rec'):
+                results['avg_rec'] = []
+
+            results['prec'][label].append(precision_dict[int(label)])
+            results['rec'][label].append(recall_dict[int(label)])
+            results['f1'][label].append(_f1(precision_dict[int(label)], recall_dict[int(label)]))
+        results['avg_rec'].append(np.mean(recall_list))
+
+        with open(results_file, 'wb') as outp:
+            outp.write(Serializable.dumps(results))
+
+#     results = dict(prec = total_prec_list, rec = total_recall_list, f1=total_f1_list, avg_rec=total_avg_recall_list)
+#
+# with open('results_depth_%d.json'%(DEPTH), 'wb') as outp:
+#     outp.write(Serializable.dumps(results))
+
+    # print "Depth was: %d"%(DEPTH)
+
+
+

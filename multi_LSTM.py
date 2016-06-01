@@ -90,7 +90,7 @@ class MultiLSTM(Serializable):
 
         # Perform the forward operation
         _, _, Y, cache = self.lstm_stack[current_depth]._forward(input_sequence)
-        instance_node.cache = cache
+        instance_node.cache[current_depth] = cache
         instance_node.children_sequence = children_sequence
         return softmax(Y)
 
@@ -109,22 +109,22 @@ class MultiLSTM(Serializable):
         :rtype:
         """
         dX, g, _, _ = self.lstm_stack[current_depth].backward_return_vector_no_update(d=derivative,
-                                                                                      cache=instance_node.cache)
-        instance_node.gradient = g
+                                                                                      cache=instance_node.cache[current_depth])
+        instance_node.gradient[current_depth] = g
         if current_depth == max_depth:
             return
         counter = 0
         for item in instance_node.children_sequence:
             node_for_item = self._get_instance_node(item.get_link_node())
-            if node_for_item.cache is None:
+            if node_for_item.cache.get(current_depth,None) is None:
                 continue
             self.calculate_backward_gradients(node_for_item, dX[counter, :, 0:self.hidden_layer_sizes[current_depth + 1]],
                                               current_depth + 1, max_depth=max_depth)
             counter += 1
 
     def update_LSTM_weights(self, instance_node, current_depth, max_depth, learning_rate_vector):
-        if not instance_node.gradient is None:
-            self.lstm_stack[current_depth].WLSTM -= learning_rate_vector[current_depth] * instance_node.gradient
+        if not instance_node.gradient.get(current_depth,None) is None:
+            self.lstm_stack[current_depth].WLSTM -= learning_rate_vector[current_depth] * instance_node.gradient[current_depth]
         if current_depth == max_depth:
             return
         for item in instance_node.children_sequence:
@@ -166,10 +166,10 @@ class MultiLSTM(Serializable):
             Y = self.forward_instance(item, 0, max_depth)
             if Y is None:
                 continue
-            print Y
+            # print Y
             predicted_label = Y.argmax()
             real_label = item.get_label()
-            print "Predicted label ", predicted_label, " real label", real_label
+            # print "Predicted label ", predicted_label, " real label", real_label
             guesses += 1
             hits += 1 if predicted_label == real_label else 0
             if predicted_label == real_label:
@@ -212,6 +212,8 @@ class MultiLSTM(Serializable):
                 print "F-1 score for label ", label, " is : ", 2 * (precision_dict[label] * recall_dict[label]) / (
                 precision_dict[label] + recall_dict[label])
                 # print "_____________________________________________________________"
+
+            return precision_dict, recall_dict, recall_list, all_labels
 
 
 
@@ -259,8 +261,8 @@ class InstanceNode:
         :type label:
         """
         self.label = label # an integer that represents the category of the item
-        self.cache = None
-        self.gradient = None
+        self.cache = {}
+        self.gradient = {}
         self.sequence_list = []
         self.sequence_control = sequence_control # Stores the specific order by which the items were fed into the LSTM to update weights correctly
         self.helper_value = {}

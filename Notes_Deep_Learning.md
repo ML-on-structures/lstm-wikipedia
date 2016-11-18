@@ -45,3 +45,19 @@ Then also use SQLite without using DAL. Also consider using SQLite in just the m
 This group of stuff together should give better file sizes.
 
 Then work on the LSTM depth structure as discussed.
+
+
+Can we predict the quality of future contributions of people who have done n edits already. 
+something interesting about their future contribution
+So here the quality of editors on this person's works might matter in establishing a quality value for this person's later contribution
+
+Another is trying to look at quarrels between authors with more than n edits, and predicting who will win
+This might use the quality of editors on each person in determining who is supported by a stronger community in general
+
+Predict when a user will become moderator in the system
+
+
+In the bitcoin tree,
+go down a random sample of branches for a node
+And then in the second lstm, go deep to like 100 nodes along these branches.
+traversing the tree differently basically

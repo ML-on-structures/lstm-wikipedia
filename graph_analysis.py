@@ -541,7 +541,7 @@ if __name__ == "__main__":
         # wikidata = {k:wikidata[k] for k in random.sample(wikidata.keys(), 10000)}
         print len(wikidata)
 
-    BREADTH = 7
+    BREADTH = 1
 
     # contrib_file = os.path.join(os.getcwd(), 'results', 'user_contrib_test.json')
     #
@@ -561,15 +561,15 @@ if __name__ == "__main__":
 
     # for depth in [1,2]:
 
-    HIDDEN_LAYER_SIZES = [2, 2, 2]
+    HIDDEN_LAYER_SIZES = [2, 13, 9]
     INPUT_SIZES = [8, 8, 8]
     LEARNING_RATE_VECTOR = [0.05, 0.5, 0.5]
-    DEPTH = 2
+    DEPTH = 3
     OBJECTIVE_FUNCTION = "softmax_classification"
     NUMBER_OF_INSTANCES = 50000
     # lstm_stack = Multi_Layer_LSTM(DEPTH, HIDDEN_LAYER_SIZES, INPUT_SIZES)
 
-    TEST_RANGE = 20
+    TEST_RANGE = 1
 
     results = {}
     total_prec_list = {}

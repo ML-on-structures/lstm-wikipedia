@@ -9,7 +9,7 @@ the elements at any depth by picking them up from the general dict
 """
 import random
 from json_plus import Serializable
-import multi_layer_lstm.lstm as lstm
+import multi_layer_lstm_lstm as lstm
 import numpy as np
 
 
@@ -36,6 +36,7 @@ class MultiLSTM(Serializable):
         self.hidden_layer_sizes = hidden_layer_sizes
         self.input_sizes = input_sizes
         self.instance_graph = instance_graph
+        self.flow_stack = []
 
     def _get_instance_node(self, link_node):
         instance_node = self.instance_graph.get(link_node[0],None)
@@ -135,6 +136,7 @@ class MultiLSTM(Serializable):
     def sgd_train_multilayer(self, root, target, max_depth, objective_function, learning_rate_vector):
         # first pass the instance root one forward so that all internal LSTM states
         # get calculated and stored in "cache" field
+        self.flow_stack = []
         Y = self.forward_instance(root, current_depth=0, max_depth=max_depth)
         deriv = getDerivative(output=Y, target=target, objective=objective_function)
         self.calculate_backward_gradients(root, deriv, 0, max_depth)

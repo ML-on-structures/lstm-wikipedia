@@ -1,7 +1,15 @@
 # Wikipedia LSTM #
 
-This repository contains a clean version of Wikipedia LSTM code.
+This repository describes the inmplementation of MLSL specifically to Wikipedia data.
 
-* The code works on training an LSTM and Neural Net combination for 
-predicting user's revision quality.
-* In order to run the learning, use `basics.py`
+The implementation is independent of the language of wikipedia being used.
+
+
+## Running Code ##
+
+* In order to run the code, currently data needs to be placed in results directory under wiki name. For example, for bgwiki, unzip the data into results as results/bgwiki/
+* Inside this wiki directory, there should be a file reduced_user_graph.json
+* Data can be obtained from: 
+* Then in the file graph_analysis.py, make sure that WIKINAME is same as the wiki being used
+* Run ``python graph_analysis.py`` to run MLSL
+* Results are stored in results/wikiname directory

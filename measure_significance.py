@@ -12,21 +12,32 @@ def significance_among(list1, list2, level):
 if __name__ == "__main__":
 
     WIKINAME = 'astwiki'
-    BREADTH = 7
+    NUMBER_OF_INSTANCES = 50000
 
+    BREADTH = 15
     DEPTH = 1
-    results_file = os.path.join(os.getcwd(), 'results', WIKINAME, 'results_breadth_%d_depth_%d.json' % (BREADTH, DEPTH))
+    # results_file = os.path.join(os.getcwd(), 'results', WIKINAME, 'results_breadth_%d_depth_%d.json' % (BREADTH, DEPTH))
+    results_file = os.path.join(os.getcwd(), 'results', WIKINAME,
+                                'results_breadth_%d_depth_%d_instances_%d.json' % (BREADTH, DEPTH, NUMBER_OF_INSTANCES))
 
     with open(results_file, 'rb') as inp:
         r1 = Serializable.loads(inp.read())
 
-    DEPTH = 2
-    results_file = os.path.join(os.getcwd(), 'results', WIKINAME, 'results_breadth_%d_depth_%d.json' % (BREADTH, DEPTH))
+    BREADTH = 3
+    DEPTH = 1
+    results_file = os.path.join(os.getcwd(), 'results', WIKINAME,
+                                'results_breadth_%d_depth_%d_instances_%d.json' % (BREADTH, DEPTH, NUMBER_OF_INSTANCES))
+
+    # results_file = os.path.join(os.getcwd(), 'results', WIKINAME, 'results_breadth_%d_depth_%d.json' % (BREADTH, DEPTH))
     with open(results_file, 'rb') as inp:
         r2 = Serializable.loads(inp.read())
+    #
+    # f1_label1_d1 = r1['f1']['0']
+    # f1_label1_d2 = r2['f1']['0']
 
-    f1_label1_d1 = r1['f1']['0']
-    f1_label1_d2 = r2['f1']['0']
+    f1_label1_d1 = r1['avg_rec']
+    f1_label1_d2 = r2['avg_rec']
+
     p, z = significance_among(f1_label1_d1, f1_label1_d2, level=0.05)
     print p, z
 

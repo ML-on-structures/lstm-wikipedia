@@ -2,6 +2,9 @@
 
 This repository describes the inmplementation of MLSL specifically to Wikipedia data.
 
+See [project page](https://sites.google.com/view/ml-on-structures) for the overall project, papers, and data. 
+
+
 The implementation is independent of the language of wikipedia being used.
 
 

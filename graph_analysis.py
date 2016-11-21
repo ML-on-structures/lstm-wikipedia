@@ -14,11 +14,8 @@ from pprint import pprint
 from datetime import datetime
 import time
 from json_plus import Serializable
-# from multi_layer_lstm.multi_layer_LSTM import Instance_node, Multi_Layer_LSTM
 from multi_LSTM import InstanceNode, SequenceItem, MultiLSTM
 import numpy as np
-
-from multi_layer_lstm.multi_layer_LSTM import Instance_node
 
 # WIKINAME = 'rmywiki'  # Very small
 WIKINAME = 'astwiki'  # Medium
@@ -194,8 +191,9 @@ def _graph_from_days_back(graph, ending=7, starting_from=None):
         pop_list = []
         previous_time = max_time - _secs_in_days(starting_from)
         ret_graph = {
-        user: {k: v for k, v in values.iteritems() if v['timestamp'] < check_time and v['timestamp'] > previous_time}
-        for user, values in graph.iteritems()}
+            user: {k: v for k, v in values.iteritems() if
+                   v['timestamp'] < check_time and v['timestamp'] > previous_time}
+            for user, values in graph.iteritems()}
 
         pop_list = [user for user, values in ret_graph.iteritems() if len(values) == 0]
 
@@ -309,61 +307,6 @@ def _get_features_of_edit(data, feature_vector_size=FEATURE_VECTOR_SIZE):
             return np.zeros(feature_vector_size)
     else:
         return None
-
-
-def build_entries_for_learning(user_graph, labels, max_depth=None):
-    """
-    Build the structure using Instance nodes form multi_layer_LSTM
-
-    From the graph of users, we need to build training trees of each
-    user and put some in training and some in test
-
-    Grpah looks like:
-    {'user0':{'rev0':[{'user00'}],
-                'rev1':[{user01}]
-                },
-     'user1':{'rev0':[{'user10'}],
-                'rev1':[{user11}]
-                },
-    }
-
-    :param user_graph:
-    :type user_graph:
-    :param max_depth:
-    :type max_depth:
-    :return:
-    :rtype:
-    """
-    instance_list = []
-
-    for user, values in user_graph.iteritems():
-        if not labels.has_key(user):
-            continue
-        new_node = Instance_node(label=labels[user])
-        for edit, data in values.iteritems():
-            new_child = Instance_node()
-            new_child.feature_vector = _get_features_of_edit(data)
-
-            # new_child.feature_vector = _get_features_of_edit(data)
-
-            # 2nd layer stuff begins
-            # print data
-            new_child_node = data['list'][0]['uname2']
-            if not user_graph.has_key(new_child_node):
-                continue
-            limit_items = {k: user_graph[new_child_node][k] for k in user_graph[new_child_node].keys()[:5]}
-            for e2, d2 in limit_items.iteritems():
-                new_grandchild = Instance_node()
-                new_grandchild.feature_vector = _get_features_of_edit(d2)
-                if new_grandchild.feature_vector is not None:
-                    new_child.children.append(new_grandchild)
-            # 2nd layer stuff ends
-            if new_child.feature_vector is not None:
-                new_node.children.append(new_child)
-
-        instance_list.append(new_node)
-
-    return instance_list
 
 
 def _get_sequence_list_for(values, sequence_control=None, limiter=None):
@@ -500,9 +443,6 @@ class GraphLearning(Serializable):
             for instance in node_data_list:
                 previous_layer_lstm_features = self._compute_features_for_lstm(instance['user2'], instance['timestamp'],
                                                                                depth_now + 1)
-                entry_features = _get_rev_features(instance)
-
-                entry_mat = _generate_matrix_for_depth()
 
                 return self.LSTMs[depth_now].forward()
 
@@ -528,7 +468,7 @@ class GraphLearning(Serializable):
 
 
 def _f1(prec, rec):
-    return (2.0*prec*rec)/(1.0*(prec+rec))
+    return (2.0 * prec * rec) / (1.0 * (prec + rec))
 
 
 if __name__ == "__main__":
@@ -555,7 +495,6 @@ if __name__ == "__main__":
 
     # labels = user_quitting_labels(wikidata)
     labels = user_reversion_label(wikidata)
-    # instance_list = build_entries_for_learning(user_graph=wikidata, labels=labels)
     instance_graph = generate_instance_graph(wikidata, labels, limiter=BREADTH)
     instance_list = instance_graph.values()
 
@@ -586,7 +525,6 @@ if __name__ == "__main__":
 
     total_avg_recall_list = []
 
-
     for iter in range(TEST_RANGE):
         t1 = time.clock()
         lstm_stack = MultiLSTM(max_depth=DEPTH,
@@ -613,13 +551,16 @@ if __name__ == "__main__":
                                              objective_function=OBJECTIVE_FUNCTION,
                                              learning_rate_vector=LEARNING_RATE_VECTOR)
         t2 = time.clock()
-        precision_dict, recall_dict, recall_list, all_labels = lstm_stack.test_model_simple(test_set, max_depth=DEPTH - 1)
+        precision_dict, recall_dict, recall_list, all_labels = lstm_stack.test_model_simple(test_set,
+                                                                                            max_depth=DEPTH - 1)
 
         t3 = time.clock()
 
-        results_file = os.path.join(os.getcwd(), 'results', WIKINAME, 'results_breadth_%d_depth_%d_instances_%d.json' % (BREADTH, DEPTH, NUMBER_OF_INSTANCES))
+        results_file = os.path.join(os.getcwd(), 'results', WIKINAME,
+                                    'results_breadth_%d_depth_%d_instances_%d.json' % (
+                                    BREADTH, DEPTH, NUMBER_OF_INSTANCES))
 
-        print "Training completed in %r"%(t2-t1)
+        print "Training completed in %r" % (t2 - t1)
         if os.path.isfile(results_file):
             with open(results_file, 'rb') as inp:
                 results = (Serializable.loads(inp.read()))
@@ -632,7 +573,7 @@ if __name__ == "__main__":
             # total_recall_list[label].append(recall_dict[label])
             # total_avg_recall_list.append(np.mean(recall_list))
             # total_f1_list[label].append(_f1(precision_dict[label], recall_dict[label]))
-            for keyname in ['prec','rec','f1']:
+            for keyname in ['prec', 'rec', 'f1']:
                 if not results.has_key(keyname):
                     results[keyname] = {}
                 if not results[keyname].has_key(label):
@@ -648,12 +589,9 @@ if __name__ == "__main__":
         with open(results_file, 'wb') as outp:
             outp.write(Serializable.dumps(results))
 
-#     results = dict(prec = total_prec_list, rec = total_recall_list, f1=total_f1_list, avg_rec=total_avg_recall_list)
-#
-# with open('results_depth_%d.json'%(DEPTH), 'wb') as outp:
-#     outp.write(Serializable.dumps(results))
+        #     results = dict(prec = total_prec_list, rec = total_recall_list, f1=total_f1_list, avg_rec=total_avg_recall_list)
+        #
+        # with open('results_depth_%d.json'%(DEPTH), 'wb') as outp:
+        #     outp.write(Serializable.dumps(results))
 
-    # print "Depth was: %d"%(DEPTH)
-
-
-
+        # print "Depth was: %d"%(DEPTH)
